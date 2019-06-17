@@ -1,0 +1,25 @@
+{
+  "name": "G2",
+  "sources": [
+    {
+      "dir": "src",
+      "backend": ["native", "bytecode"]
+    },
+    {
+      "dir": "example",
+      "backend": ["native", "bytecode"]
+    }
+  ],
+  "entries": [
+    {
+      "backend": "native",
+      "main-module": "Example"
+    }, {
+      "backend": "bytecode",
+      "main-module": "Example"
+    }
+  ],
+  "bs-dependencies": ["g2platform"],
+  "build-script": "build_script.re",
+  "refmt": 3
+}

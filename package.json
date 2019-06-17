@@ -1,0 +1,17 @@
+{
+  "name": "2g",
+  "version": "0.0.1-0.wip",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "example": "./lib/bs/native/example.native",
+    "build": "bsb -make-world",
+    "clean": "bsb -clean-world"
+  },
+  "dependencies": {
+    "g2platform": "file:./include/platform/"
+  },
+  "devDependencies": {
+    "bsb-native": "^4.0.1100"
+  }
+}
