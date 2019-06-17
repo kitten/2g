@@ -6,10 +6,10 @@ type bindingsT;
 
 [@noalloc] external _start: unit => unit = "tg_start";
 
-let init_noop = () => ();
-let frame_noop = () => ();
-
-let start = (~init=init_noop, ~frame=frame_noop, ()) => {
+let start = (
+  ~init: unit => 't,
+  ~frame: 't => 't
+) => {
   Callback.register("tg_init_cb", init);
   Callback.register("tg_frame_cb", frame);
   _start();

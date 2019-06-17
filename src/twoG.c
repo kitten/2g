@@ -158,11 +158,15 @@ CAMLprim value tg_make_bindings(value buffer) {
 
 /*-- main lifecycle --------------------------------------------------------*/
 
-static sg_pass_action pass_action;
+typedef struct {
+  value v;
+} tg_state;
+
 static value* frame_callback = NULL;
 static value* init_callback = NULL;
+static value* user_state = NULL;
 
-void _tg_init() {
+void _tg_init(void* data) {
   gladLoadGL();
 
   sg_setup(&(sg_desc){
@@ -175,12 +179,9 @@ void _tg_init() {
     .d3d11_depth_stencil_view_cb = sapp_d3d11_get_depth_stencil_view,
   });
 
-  pass_action = (sg_pass_action) {
-    .colors[0] = { .action=SG_ACTION_CLEAR, .val={0.2f, 0.2f, 0.2f, 1.0f} }
-  };
-
   if (init_callback != NULL) {
-    caml_callback(*init_callback, Val_unit);
+    tg_state* state = (tg_state*) data;
+    state->v = caml_callback(*init_callback, Val_unit);
   }
 }
 
@@ -188,9 +189,10 @@ void _tg_cleanup() {
   sg_shutdown();
 }
 
-void _tg_frame() {
+void _tg_frame(void* data) {
   if (frame_callback != NULL) {
-    caml_callback(*frame_callback, Val_unit);
+    tg_state* state = (tg_state*) data;
+    state->v = caml_callback(*frame_callback, state->v);
   }
 }
 
@@ -208,9 +210,12 @@ void tg_start() {
   init_callback = caml_named_value("tg_init_cb");
   frame_callback = caml_named_value("tg_frame_cb");
 
+  tg_state* state = malloc(sizeof(tg_state));
+
   sapp_run(&(sapp_desc){
-    .init_cb = _tg_init,
-    .frame_cb = _tg_frame,
+    .user_data = state,
+    .init_userdata_cb = _tg_init,
+    .frame_userdata_cb = _tg_frame,
     .cleanup_cb = _tg_cleanup,
     .event_cb = _tg_event,
     .fail_cb = _tg_fail,
@@ -226,6 +231,13 @@ void tg_start() {
 void tg_begin_pass() {
   CAMLparam0();
 
+  sg_pass_action pass_action = {
+    .colors[0] = {
+      .action=SG_ACTION_CLEAR,
+      .val={ 0.2f, 0.2f, 0.2f, 1.0f },
+    }
+  };
+
   const float w = (float) sapp_width();
   const float h = (float) sapp_height();
 
@@ -234,7 +246,7 @@ void tg_begin_pass() {
 
 void tg_draw(value base_element, value num_elements, value num_instances) {
   CAMLparam3(base_element, num_elements, num_instances);
-  sg_draw(Val_int(base_element), Val_int(num_elements), Val_int(num_instances));
+  sg_draw(Int_val(base_element), Int_val(num_elements), Int_val(num_instances));
 }
 
 void tg_end_pass() {
@@ -260,11 +272,9 @@ void tg_apply_bindings(value bindings) {
 
 void tg_apply_vertex_buffer(value buffer) {
   CAMLparam1(buffer);
-  sg_buffer buffer_val = *(sg_buffer *) Data_custom_val(buffer);
 
-  sg_bindings bindings = {
-    .vertex_buffers[0] = buffer_val
-  };
+  sg_buffer buffer_val = *(sg_buffer *) Data_custom_val(buffer);
+  sg_bindings bindings = { .vertex_buffers[0] = buffer_val };
 
   sg_apply_bindings(&bindings);
 }
