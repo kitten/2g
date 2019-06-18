@@ -19,6 +19,7 @@ external makeBuffer: bufferDescT => bufferT = "tg_make_buffer";
 external makeShader: (~vs: string, ~fs: string) => shaderT = "tg_make_shader";
 external makePipeline: shaderT => pipelineT = "tg_make_pipeline";
 external makeBindings: bufferT => bindingsT = "tg_make_bindings";
+external basicPipeline: unit => pipelineT = "tg_basic_pipeline";
 
 external applyPipeline: pipelineT => unit = "tg_apply_pipeline";
 external applyBindings: bindingsT => unit = "tg_apply_bindings";

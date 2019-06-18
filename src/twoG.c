@@ -8,6 +8,7 @@
 #include <caml/bigarray.h>
 
 #include "sokol/sokol.h"
+#include "shaders/basic.h"
 
 /*-- sg_buffer --------------------------------------------------------*/
 
@@ -156,6 +157,27 @@ CAMLprim value tg_make_bindings(value buffer) {
   CAMLreturn(ret);
 }
 
+/*-- built-in shaders --------------------------------------------------------*/
+
+CAMLprim value tg_basic_pipeline() {
+  CAMLparam0();
+  CAMLlocal1(ret);
+
+  sg_shader shader = sg_make_shader(basic_shader_desc());
+  sg_pipeline pipeline = sg_make_pipeline(&(sg_pipeline_desc){
+    .shader = shader,
+    .layout = {
+      .attrs = {
+        [ATTR_vs_position].format=SG_VERTEXFORMAT_FLOAT3,
+        [ATTR_vs_color].format=SG_VERTEXFORMAT_FLOAT4
+      }
+    }
+  });
+
+  ret = _tg_copy_pipeline(&pipeline);
+  CAMLreturn(ret);
+}
+
 /*-- main lifecycle --------------------------------------------------------*/
 
 typedef struct {
@@ -167,7 +189,7 @@ static value* init_callback = NULL;
 static value* user_state = NULL;
 
 void _tg_init(void* data) {
-  gladLoadGL();
+  loadGraphics();
 
   sg_setup(&(sg_desc){
     .mtl_device = sapp_metal_get_device(),
