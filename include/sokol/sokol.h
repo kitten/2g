@@ -8,7 +8,7 @@
   #define SOKOL_GLCORE33
 #endif
 
-#if defined(SOKOL_GLCORE33)
+#if defined(SOKOL_GLCORE33)||defined(SOKOL_GLES2)||defined(SOKOL_GLES3)
   #include "glad/glad.h"
 #endif
 
