@@ -1,7 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 
-const platformArgs = [];
+const platformArgs = [
+  "-lc++"
+];
 
 if (process.platform === "darwin") {
   platformArgs.push(
