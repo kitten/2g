@@ -1,5 +1,9 @@
 #include "twoG_glsl.h"
 
+CAMLprim value tg_target() {
+  return Val_int(glsl_target());
+}
+
 CAMLprim value tg_convert_vertex(value vs) {
   CAMLparam1(vs);
   char* vs_opt = (char*) glsl_convert_vertex(String_val(vs));

@@ -32,9 +32,19 @@ let start = (
   Internals.start();
 };
 
+let pragmaVersionRe = Str.regexp("#version 300 es");
+
+let pragmaVersionTarget = switch (TwoG_glsl.getTarget()) {
+| OpenGL => "#version 330"
+| OpenGLES2 => "#version 200 es"
+| OpenGLES3 => "#version 300 es"
+| Metal => ""
+};
+
 let makeShader = (~vs, ~fs) => {
-  let vs = TwoG_glsl.convertVertexShader(vs);
-  let fs = TwoG_glsl.convertFragmentShader(fs);
+  let fixVersionPragma = Str.replace_first(pragmaVersionRe, pragmaVersionTarget);
+  let vs = TwoG_glsl.convertVertexShader(vs) |> fixVersionPragma;
+  let fs = TwoG_glsl.convertFragmentShader(fs) |> fixVersionPragma;
   Internals.makeShader(~vs, ~fs);
 };
 

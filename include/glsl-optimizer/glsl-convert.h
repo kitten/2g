@@ -18,12 +18,17 @@
 static enum glslopt_options opts = kGlslOptionSkipPreprocessor;
 static glslopt_ctx* ctx = NULL;
 
+SOKOL_API_DECL int glsl_target();
 SOKOL_API_DECL const char* glsl_convert(char* source, enum glslopt_shader_type type);
 SOKOL_API_DECL const char* glsl_convert_vertex(char* source);
 SOKOL_API_DECL const char* glsl_convert_fragment(char* source);
 
 /*-- IMPLEMENTATION --------------------------------------------------------*/
 #ifdef SOKOL_IMPL
+
+SOKOL_API_DECL int glsl_target() {
+  return target;
+}
 
 SOKOL_API_DECL const char* glsl_convert(char* source, enum glslopt_shader_type type) {
   if (ctx == NULL) {
