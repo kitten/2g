@@ -1,14 +1,10 @@
-#include <stdio.h>
-#include <string.h>
+#import "twoG.h"
 
-#include <caml/custom.h>
-#include <caml/callback.h>
-#include <caml/memory.h>
-#include <caml/mlvalues.h>
-#include <caml/bigarray.h>
-
-#include "sokol/sokol.h"
-#include "shaders/basic.h"
+#if defined(SOKOL_METAL)
+  static char* entry = "xlatMtlMain";
+#else
+  static char* entry = "main";
+#endif
 
 /*-- sg_buffer --------------------------------------------------------*/
 
@@ -71,7 +67,6 @@ static value _tg_copy_shader(sg_shader* shader) {
 
   val = caml_alloc_custom(&tg_shader, sizeof(sg_shader), 0, 1);
   memcpy(Data_custom_val(val), shader, sizeof(sg_shader));
-
   CAMLreturn(val);
 }
 
@@ -80,8 +75,18 @@ CAMLprim value tg_make_shader(value vs, value fs) {
   CAMLlocal1(ret);
 
   sg_shader shader = sg_make_shader(&(sg_shader_desc){
-    .vs.source = String_val(vs),
-    .fs.source = String_val(fs),
+    .attrs = {
+      [0].name = "position",
+      [1].name = "color",
+    },
+    .vs = {
+      .source = String_val(vs),
+      .entry = entry,
+    },
+    .fs = {
+      .source = String_val(fs),
+      .entry = entry,
+    },
   });
 
   ret = _tg_copy_shader(&shader);
@@ -123,8 +128,8 @@ CAMLprim value tg_make_pipeline(value shader) {
     .shader = shader_val,
     .layout = {
       .attrs = {
-        [0].format=SG_VERTEXFORMAT_FLOAT3,
-        [1].format=SG_VERTEXFORMAT_FLOAT4
+        [0].format = SG_VERTEXFORMAT_FLOAT3,
+        [1].format = SG_VERTEXFORMAT_FLOAT4
       }
     }
   });
@@ -154,27 +159,6 @@ CAMLprim value tg_make_bindings(value buffer) {
 
   ret = caml_alloc_custom(&tg_pipeline, sizeof(sg_bindings), 0, 1);
   memcpy(Data_custom_val(ret), bindings, sizeof(sg_bindings));
-  CAMLreturn(ret);
-}
-
-/*-- built-in shaders --------------------------------------------------------*/
-
-CAMLprim value tg_basic_pipeline() {
-  CAMLparam0();
-  CAMLlocal1(ret);
-
-  sg_shader shader = sg_make_shader(basic_shader_desc());
-  sg_pipeline pipeline = sg_make_pipeline(&(sg_pipeline_desc){
-    .shader = shader,
-    .layout = {
-      .attrs = {
-        [ATTR_vs_position].format=SG_VERTEXFORMAT_FLOAT3,
-        [ATTR_vs_color].format=SG_VERTEXFORMAT_FLOAT4
-      }
-    }
-  });
-
-  ret = _tg_copy_pipeline(&pipeline);
   CAMLreturn(ret);
 }
 

@@ -1,3 +1,5 @@
+#pragma once
+
 #define SOKOL_NO_ENTRY
 #define SOKOL_NO_DEPRECATED
 

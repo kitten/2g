@@ -1,6 +1,11 @@
 #pragma once
+
 #ifndef GLSL_OPTIMIZER_H
 #define GLSL_OPTIMIZER_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  Main GLSL optimizer interface.
@@ -21,8 +26,13 @@
  glslopt_cleanup (ctx);
 */
 
+#ifdef __cplusplus
 struct glslopt_shader;
 struct glslopt_ctx;
+#else
+typedef struct {} glslopt_shader;
+typedef struct {} glslopt_ctx;
+#endif
 
 enum glslopt_shader_type {
 	kGlslOptShaderVertex = 0,
@@ -56,6 +66,7 @@ enum glslopt_basic_type {
 	kGlslTypeOther,
 	kGlslTypeCount
 };
+
 enum glslopt_precision {
 	kGlslPrecHigh = 0,
 	kGlslPrecMedium,
@@ -63,12 +74,12 @@ enum glslopt_precision {
 	kGlslPrecCount
 };
 
-glslopt_ctx* glslopt_initialize (glslopt_target target);
+glslopt_ctx* glslopt_initialize (enum glslopt_target target);
 void glslopt_cleanup (glslopt_ctx* ctx);
 
 void glslopt_set_max_unroll_iterations (glslopt_ctx* ctx, unsigned iterations);
 
-glslopt_shader* glslopt_optimize (glslopt_ctx* ctx, glslopt_shader_type type, const char* shaderSource, unsigned options);
+glslopt_shader* glslopt_optimize (glslopt_ctx* ctx, enum glslopt_shader_type type, const char* shaderSource, unsigned options);
 bool glslopt_get_status (glslopt_shader* shader);
 const char* glslopt_get_output (glslopt_shader* shader);
 const char* glslopt_get_raw_output (glslopt_shader* shader);
@@ -76,16 +87,19 @@ const char* glslopt_get_log (glslopt_shader* shader);
 void glslopt_shader_delete (glslopt_shader* shader);
 
 int glslopt_shader_get_input_count (glslopt_shader* shader);
-void glslopt_shader_get_input_desc (glslopt_shader* shader, int index, const char** outName, glslopt_basic_type* outType, glslopt_precision* outPrec, int* outVecSize, int* outMatSize, int* outArraySize, int* outLocation);
+void glslopt_shader_get_input_desc (glslopt_shader* shader, int index, const char** outName, enum glslopt_basic_type* outType, enum glslopt_precision* outPrec, int* outVecSize, int* outMatSize, int* outArraySize, int* outLocation);
 int glslopt_shader_get_uniform_count (glslopt_shader* shader);
 int glslopt_shader_get_uniform_total_size (glslopt_shader* shader);
-void glslopt_shader_get_uniform_desc (glslopt_shader* shader, int index, const char** outName, glslopt_basic_type* outType, glslopt_precision* outPrec, int* outVecSize, int* outMatSize, int* outArraySize, int* outLocation);
+void glslopt_shader_get_uniform_desc (glslopt_shader* shader, int index, const char** outName, enum glslopt_basic_type* outType, enum glslopt_precision* outPrec, int* outVecSize, int* outMatSize, int* outArraySize, int* outLocation);
 int glslopt_shader_get_texture_count (glslopt_shader* shader);
-void glslopt_shader_get_texture_desc (glslopt_shader* shader, int index, const char** outName, glslopt_basic_type* outType, glslopt_precision* outPrec, int* outVecSize, int* outMatSize, int* outArraySize, int* outLocation);
+void glslopt_shader_get_texture_desc (glslopt_shader* shader, int index, const char** outName, enum glslopt_basic_type* outType, enum glslopt_precision* outPrec, int* outVecSize, int* outMatSize, int* outArraySize, int* outLocation);
 
 // Get *very* approximate shader stats:
 // Number of math, texture and flow control instructions.
 void glslopt_shader_get_stats (glslopt_shader* shader, int* approxMath, int* approxTex, int* approxFlow);
 
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif /* GLSL_OPTIMIZER_H */

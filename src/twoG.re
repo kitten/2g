@@ -4,7 +4,24 @@ type shaderT;
 type pipelineT;
 type bindingsT;
 
-[@noalloc] external _start: unit => unit = "tg_start";
+module Internals = {
+  [@noalloc] external start: unit => unit = "tg_start";
+
+  external makeBuffer: bufferDescT => bufferT = "tg_make_buffer";
+  external makeShader: (~vs: string, ~fs: string) => shaderT = "tg_make_shader";
+
+  external makePipeline: shaderT => pipelineT = "tg_make_pipeline";
+  external makeBindings: bufferT => bindingsT = "tg_make_bindings";
+
+  external applyPipeline: pipelineT => unit = "tg_apply_pipeline";
+  external applyBindings: bindingsT => unit = "tg_apply_bindings";
+  external applyVertexBuffer: bufferT => unit = "tg_apply_vertex_buffer";
+
+  [@noalloc] external beginPass: unit => unit = "tg_begin_pass";
+  [@noalloc] external draw: (int, int, int) => unit = "tg_draw";
+  [@noalloc] external endPass: unit => unit = "tg_end_pass";
+  [@noalloc] external commit: unit => unit = "tg_commit";
+};
 
 let start = (
   ~init: unit => 't,
@@ -12,20 +29,22 @@ let start = (
 ) => {
   Callback.register("tg_init_cb", init);
   Callback.register("tg_frame_cb", frame);
-  _start();
+  Internals.start();
 };
 
-external makeBuffer: bufferDescT => bufferT = "tg_make_buffer";
-external makeShader: (~vs: string, ~fs: string) => shaderT = "tg_make_shader";
-external makePipeline: shaderT => pipelineT = "tg_make_pipeline";
-external makeBindings: bufferT => bindingsT = "tg_make_bindings";
-external basicPipeline: unit => pipelineT = "tg_basic_pipeline";
+let makeShader = (~vs, ~fs) => {
+  let vs = TwoG_glsl.convertVertexShader(vs);
+  let fs = TwoG_glsl.convertFragmentShader(fs);
+  Internals.makeShader(~vs, ~fs);
+};
 
-external applyPipeline: pipelineT => unit = "tg_apply_pipeline";
-external applyBindings: bindingsT => unit = "tg_apply_bindings";
-external applyVertexBuffer: bufferT => unit = "tg_apply_vertex_buffer";
-
-[@noalloc] external beginPass: unit => unit = "tg_begin_pass";
-[@noalloc] external draw: (int, int, int) => unit = "tg_draw";
-[@noalloc] external endPass: unit => unit = "tg_end_pass";
-[@noalloc] external commit: unit => unit = "tg_commit";
+let makeBuffer = Internals.makeBuffer;
+let makePipeline = Internals.makePipeline;
+let makeBindings = Internals.makeBindings;
+let applyPipeline = Internals.applyPipeline;
+let applyBindings = Internals.applyBindings;
+let applyVertexBuffer = Internals.applyVertexBuffer;
+let beginPass = Internals.beginPass;
+let draw = Internals.draw;
+let endPass = Internals.endPass;
+let commit = Internals.commit;

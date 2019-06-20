@@ -44,8 +44,8 @@ let glslfiles = [|
   "opt_tree_grafting.cpp", "opt_vectorize.cpp", "s_expression.cpp", "standalone_scaffolding.cpp"
 |];
 
-gcc(~includes, ~flags, "lib" +/ "util-hashtable.o", [glslopt +/ "util" +/ "hash_table.c"]);
-gcc(~includes, ~flags, "lib" +/ "util-ralloc.o", [glslopt +/ "util" +/ "ralloc.c"]);
+gcc(~flags, "lib" +/ "util-hashtable.o", [glslopt +/ "util" +/ "hash_table.c"]);
+gcc(~flags, "lib" +/ "util-ralloc.o", [glslopt +/ "util" +/ "ralloc.c"]);
 
 gcc(~includes=[glslopt], ~flags, "lib" +/ "mesa-imports.o", [mesa +/ "main" +/ "imports.c"]);
 gcc(~includes=[glslopt], ~flags, "lib" +/ "mesa-prog-hash-table.o", [mesa +/ "program" +/ "prog_hash_table.c"]);
@@ -71,4 +71,5 @@ Array.iter(file => {
 gcc(~includes, ~flags, "lib" +/ "glad.o", ["include" +/ "glad" +/ "glad.c"]);
 gcc(~includes, ~flags=objcflags, "lib" +/ "sokol.o", ["include" +/ "sokol" +/ "sokol.c"]);
 
+gcc(~includes, ~flags, "lib" +/ "g2-glsl.o", ["src" +/ "twoG_glsl.c"]);
 gcc(~includes, ~flags, "lib" +/ "g2.o", ["src" +/ "twoG.c"]);
