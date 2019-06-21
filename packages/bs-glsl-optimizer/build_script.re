@@ -3,10 +3,7 @@ open Bsb_internals;
 let ( +/ ) = Filename.concat;
 
 let includes = ["include"];
-let isMacOS = Sys.unix && input_line(Unix.open_process_in("uname")) == "Darwin";
-
 let flags = ["-O3"];
-let objcflags = isMacOS ? ["-O3", "-x objective-c", "-fobjc-arc"] : ["-O3"];
 
 let cppflags = [
   "-O3",
@@ -16,8 +13,7 @@ let cppflags = [
   "-Wno-return-type"
 ];
 
-let glslopt = "include" +/ "glsl-optimizer";
-let glsloptlib = "lib" +/ "glsl-optimizer";
+let glslopt = "include";
 let glsl = glslopt +/ "glsl";
 let glcpp = glsl +/ "glcpp";
 let mesa = glslopt +/ "mesa";
@@ -68,8 +64,4 @@ Array.iter(file => {
   );
 }, glslfiles);
 
-gcc(~includes, ~flags, "lib" +/ "glad.o", ["include" +/ "glad" +/ "glad.c"]);
-gcc(~includes, ~flags=objcflags, "lib" +/ "sokol.o", ["include" +/ "sokol" +/ "sokol.c"]);
-
-gcc(~includes, ~flags, "lib" +/ "g2-glsl.o", ["src" +/ "twoG_glsl.c"]);
-gcc(~includes, ~flags, "lib" +/ "g2.o", ["src" +/ "twoG.c"]);
+gcc(~includes, ~flags, "lib" +/ "bs-glsl-optimizer.o", ["src" +/ "bs-glsl-optimizer.c"]);

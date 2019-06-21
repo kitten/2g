@@ -1,0 +1,14 @@
+{
+  "name": "bs-glsl-optimizer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bindings to glsl-optimizer for bsb-native",
+  "scripts": {
+    "build": "bsb -make-world",
+    "clean": "bsb -clean-world",
+    "postinstall": "node postinstall.js"
+  },
+  "devDependencies": {
+    "bsb-native": "^4.0.1100"
+  }
+}

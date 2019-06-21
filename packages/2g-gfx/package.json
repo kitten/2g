@@ -1,0 +1,17 @@
+{
+  "name": "2g-gfx",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "bsb -make-world -backend native",
+    "clean": "bsb -clean-world",
+    "postinstall": "node postinstall.js"
+  },
+  "dependencies": {
+    "bs-glsl-optimizer": "*"
+  },
+  "devDependencies": {
+    "bsb-native": "^4.0.1100"
+  }
+}

@@ -1,10 +1,6 @@
 {
-  "name": "G2",
+  "name": "2g-example",
   "sources": [
-    {
-      "dir": "src",
-      "backend": ["native", "bytecode"]
-    },
     {
       "dir": "example",
       "backend": ["native", "bytecode"]
@@ -19,7 +15,6 @@
       "main-module": "Example"
     }
   ],
-  "bs-dependencies": ["g2platform"],
-  "build-script": "build_script.re",
+  "bs-dependencies": ["2g-gfx"],
   "refmt": 3
 }

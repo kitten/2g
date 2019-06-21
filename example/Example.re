@@ -1,3 +1,5 @@
+module TwoG = TwoG_Gfx;
+
 let vs = {|
   #version 300 es
 

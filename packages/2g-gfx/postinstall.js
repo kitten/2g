@@ -41,10 +41,15 @@ if (process.platform === "darwin") {
 }
 
 const bsconfig = {
-  name: "g2platform",
-  sources: "src",
+  name: "2g-gfx",
+  sources: {
+    dir: "src",
+    files: ["TwoG_Gfx.re"]
+  },
   "c-linker-flags": platformArgs,
   "allowed-build-kinds": ["bytecode", "native"],
+  "build-script": "build_script.re",
+  "bs-dependencies": ["bs-glsl-optimizer"],
   refmt: 3
 };
 
