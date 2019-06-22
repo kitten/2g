@@ -9,6 +9,8 @@
 
 #include "sokol.h"
 
+#define Val_none Val_int(0)
+
 #if defined(SOKOL_METAL)
   static char* entry = "xlatMtlMain";
 #else
@@ -79,7 +81,7 @@ static value _tg_copy_shader(sg_shader* shader) {
   CAMLreturn(val);
 }
 
-CAMLprim value tg_make_shader(value vs, value fs, value attrs) {
+CAMLprim value tg_make_shader(value vs, value fs, value attrs, value textures) {
   CAMLparam3(vs, fs, attrs);
   CAMLlocal1(ret);
 
@@ -97,6 +99,12 @@ CAMLprim value tg_make_shader(value vs, value fs, value attrs) {
   int attrs_size = Wosize_val(attrs);
   for (int i = 0; i < attrs_size; i++) {
     shader_desc.attrs[i].name = String_val(Field(attrs, i));
+  }
+
+  int textures_size = Wosize_val(textures);
+  for (int i = 0; i < textures_size; i++) {
+    shader_desc.fs.images[i].name = String_val(Field(Field(attrs, i), 0));
+    shader_desc.fs.images[i].type = Int_val(Field(Field(attrs, i), 1));
   }
 
   sg_shader shader = sg_make_shader(&shader_desc);
@@ -144,30 +152,6 @@ CAMLprim value tg_make_pipeline(value shader, value formats) {
 
   sg_pipeline pipeline = sg_make_pipeline(&pipeline_desc);
   ret = _tg_copy_pipeline(&pipeline);
-  CAMLreturn(ret);
-}
-
-/*-- sg_bindings --------------------------------------------------------*/
-
-static struct custom_operations tg_bindings = {
-  .identifier = "sg_bindings",
-  .finalize = custom_finalize_default,
-  .compare = custom_compare_default,
-  .hash = custom_hash_default,
-  .serialize = custom_serialize_default,
-  .deserialize = custom_deserialize_default,
-};
-
-CAMLprim value tg_make_bindings(value buffer) {
-  CAMLparam1(buffer);
-  CAMLlocal1(ret);
-
-  sg_bindings* bindings = (&(sg_bindings){
-    .vertex_buffers[0] = *(sg_buffer *) Data_custom_val(buffer),
-  });
-
-  ret = caml_alloc_custom(&tg_pipeline, sizeof(sg_bindings), 0, 1);
-  memcpy(Data_custom_val(ret), bindings, sizeof(sg_bindings));
   CAMLreturn(ret);
 }
 
@@ -242,20 +226,32 @@ void tg_start() {
 
 /*-- stateful calls --------------------------------------------------------*/
 
-void tg_begin_pass() {
-  CAMLparam0();
+void tg_begin_pass(value color, value clear) {
+  CAMLparam2(color, clear);
+
+  const float r = (float) Double_val(Field(color, 0));
+  const float g = (float) Double_val(Field(color, 1));
+  const float b = (float) Double_val(Field(color, 2));
+  const float a = (float) Double_val(Field(color, 3));
+
+  enum sg_action action_enum;
+  if (clear == Val_true) {
+    action_enum = SG_ACTION_CLEAR;
+  } else {
+    action_enum = SG_ACTION_LOAD;
+  }
 
   sg_pass_action pass_action = {
     .colors[0] = {
-      .action=SG_ACTION_CLEAR,
-      .val={ 0.2f, 0.2f, 0.2f, 1.0f },
+      .action=action_enum,
+      .val={ r, g, b, a },
     }
   };
 
-  const float w = (float) sapp_width();
-  const float h = (float) sapp_height();
+  const int w = (int) sapp_width();
+  const int h = (int) sapp_height();
 
-  sg_begin_default_pass(&pass_action, (int)w, (int)h);
+  sg_begin_default_pass(&pass_action, w, h);
 }
 
 void tg_draw(value base_element, value num_elements, value num_instances) {
@@ -279,16 +275,19 @@ void tg_apply_pipeline(value pipeline) {
   sg_apply_pipeline(pipeline_val);
 }
 
-void tg_apply_bindings(value bindings) {
-  CAMLparam1(bindings);
-  sg_apply_bindings((sg_bindings *) Data_custom_val(bindings));
-}
+void tg_apply_buffers(value index_buffer, value buffers) {
+  CAMLparam2(index_buffer, buffers);
 
-void tg_apply_vertex_buffer(value buffer) {
-  CAMLparam1(buffer);
+  sg_bindings bindings = {};
 
-  sg_buffer buffer_val = *(sg_buffer *) Data_custom_val(buffer);
-  sg_bindings bindings = { .vertex_buffers[0] = buffer_val };
+  int vb_size = Wosize_val(buffers);
+  for (int i = 0; i < vb_size; i++) {
+    bindings.vertex_buffers[i] = *(sg_buffer *) Data_custom_val(Field(buffers, i));
+  }
+
+  if (index_buffer != Val_none) {
+    bindings.index_buffer = *(sg_buffer *) Data_custom_val(index_buffer);
+  }
 
   sg_apply_bindings(&bindings);
 }

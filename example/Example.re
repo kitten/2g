@@ -35,18 +35,17 @@ let init = () => {
   |]);
 
   let buffer = TwoG.makeBuffer(vertices);
-  let bindings = TwoG.makeBindings(buffer);
   let program = TwoG.makeProgram(~vs, ~fs);
 
-  (bindings, program)
+  (buffer, program)
 };
 
 let frame = (state) => {
-  let (bindings, program) = state;
+  let (buffer, program) = state;
 
   TwoG.beginPass();
   TwoG.applyPipeline(program);
-  TwoG.applyBindings(bindings);
+  TwoG.applyBuffers([|buffer|]);
   TwoG.draw(0, 3, 1);
   TwoG.endPass();
   TwoG.commit();

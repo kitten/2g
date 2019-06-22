@@ -1,4 +1,10 @@
-exception InvalidAttrFormat(string);
+exception InvalidAttribute(string);
+exception InvalidTexture(string);
+
+/* sg_action */
+type passAction =
+  | Clear
+  | Load;
 
 /* sg_vertex_format */
 type vertexFormat =
@@ -19,6 +25,21 @@ type vertexFormat =
   | Num
   | ForceU32;
 
+/* sg_image_type */
+type textureFormat =
+  | Default
+  | Sampler2D
+  | SamplerCube
+  | Sampler3D
+  | SamplerArray;
+
+type colorT = (float, float, float, float);
+
+type textureT = {
+  name: string,
+  format: textureFormat
+};
+
 type bufferDescT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
 type bufferT;
 type shaderT;
@@ -30,13 +51,9 @@ let makeShader: (~vs: string, ~fs: string, ~attrs: array(string)) => pipelineT;
 let makePipeline: (shaderT, array(vertexFormat)) => pipelineT;
 let makeProgram: (~vs: string, ~fs: string) => pipelineT;
 let makeBuffer: bufferDescT => bufferT;
-let makeBindings: bufferT => bindingsT;
-
 let applyPipeline: pipelineT => unit;
-let applyBindings: bindingsT => unit;
-let applyVertexBuffer: bufferT => unit;
-
-let beginPass: unit => unit;
+let applyBuffers: (~indexBuffer: bufferT=?, array(bufferT)) => unit;
+let beginPass: (~clearColor: colorT=?, unit) => unit;
 let draw: (int, int, int) => unit;
 let endPass: unit => unit;
 let commit: unit => unit;

@@ -57,7 +57,6 @@ let pragmaVersionTarget = switch (getTarget()) {
 
 let fixPragmaVersion = Str.replace_first(pragmaVersionRe, pragmaVersionTarget);
 
-
 external _getOutput: shaderT => string = "tg_get_output";
 
 let getOutput = (shader: shaderT): string =>
