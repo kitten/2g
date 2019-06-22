@@ -99,7 +99,9 @@ let toUniformFormat = (uniform: GlslOptimizer.shaderDescT) => {
   | (Float, 2, 1) => UNI_FLOAT2
   | (Float, 3, 1) => UNI_FLOAT3
   | (Float, 4, 1) => UNI_FLOAT4
-  | (Float, 1, 4) => UNI_MAT4
+  | (Float, 4, 4) => UNI_MAT4
+  | (Float, _, _) =>
+    raise(InvalidUniform("Float uniforms can only be float, vec2, vec3, vec4, or mat4"))
   | (_, _, _) =>
     raise(InvalidUniform("Uniforms must be of type Float."))
   }
