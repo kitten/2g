@@ -38,7 +38,8 @@ type textureT = {
   format: textureFormat
 };
 
-type bufferDescT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
+type bigarrayT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
+
 type bufferT;
 type shaderT;
 type pipelineT;
@@ -111,7 +112,13 @@ let makeProgram = (~vs, ~fs) => {
   makePipeline(shader, formats);
 };
 
-external makeBuffer: bufferDescT => bufferT = "tg_make_buffer";
+external bufferOfBigarray: bigarrayT => bufferT = "tg_make_buffer";
+
+let bufferOfArray = (data: array(float)) => {
+  Bigarray.Array1.of_array(Float32, C_layout, data)
+    |> bufferOfBigarray
+};
+
 external applyPipeline: pipelineT => unit = "tg_apply_pipeline";
 
 [@noalloc] external applyBuffers: (

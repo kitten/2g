@@ -24,28 +24,30 @@ let fs = {|
   }
 |};
 
-let toBuffer = arr =>
-  Bigarray.Array1.of_array(Float32, C_layout, arr);
-
 let init = () => {
-  let vertices = toBuffer([|
-    0.0, 0.5, 0.5, 1.0, 0.0, 0.0, 1.0,
-    0.5, -0.5, 0.5, 0.0, 1.0, 0.0, 1.0,
-    -0.5, -0.5, 0.5, 0.0, 0.0, 1.0, 1.0
+  let vertices = TwoG.bufferOfArray([|
+    0.0, 0.5, 0.5,
+    0.5, -0.5, 0.5,
+    -0.5, -0.5, 0.5,
   |]);
 
-  let buffer = TwoG.makeBuffer(vertices);
+  let colors = TwoG.bufferOfArray([|
+    1.0, 0.0, 0.0, 1.0,
+    0.0, 1.0, 0.0, 1.0,
+    0.0, 0.0, 1.0, 1.0
+  |]);
+
   let program = TwoG.makeProgram(~vs, ~fs);
 
-  (buffer, program)
+  (vertices, colors, program)
 };
 
 let frame = (state) => {
-  let (buffer, program) = state;
+  let (vertices, colors, program) = state;
 
   TwoG.beginPass();
   TwoG.applyPipeline(program);
-  TwoG.applyBuffers([|buffer|]);
+  TwoG.applyBuffers([|vertices, colors|]);
   TwoG.draw(0, 3, 1);
   TwoG.endPass();
   TwoG.commit();

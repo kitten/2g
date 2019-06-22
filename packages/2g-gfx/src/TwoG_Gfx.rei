@@ -46,11 +46,13 @@ type shaderT;
 type pipelineT;
 type bindingsT;
 
+let bufferOfBigarray: bufferDescT => bufferT;
+let bufferOfArray: array(float) => bufferT;
+
 let start: (~init: unit => 't, ~frame: 't => 't) => unit;
 let makeShader: (~vs: string, ~fs: string, ~attrs: array(string)) => pipelineT;
 let makePipeline: (shaderT, array(vertexFormat)) => pipelineT;
 let makeProgram: (~vs: string, ~fs: string) => pipelineT;
-let makeBuffer: bufferDescT => bufferT;
 let applyPipeline: pipelineT => unit;
 let applyBuffers: (~indexBuffer: bufferT=?, array(bufferT)) => unit;
 let beginPass: (~clearColor: colorT=?, unit) => unit;
