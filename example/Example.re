@@ -5,10 +5,13 @@ let vs = {|
 
   in vec3 position;
   in vec4 color;
+
+  uniform vec3 scale;
+
   out vec4 out_color;
 
   void main() {
-    gl_Position = vec4(position.xyz, 1);
+    gl_Position = vec4(position.xyz * scale, 1.0);
     out_color = color;
   }
 |};
@@ -48,6 +51,11 @@ let frame = (state) => {
   TwoG.beginPass();
   TwoG.applyPipeline(program);
   TwoG.applyBuffers([|vertices, colors|]);
+
+  TwoG.applyVertexUniforms([|
+    Vec3(1.5, 1.0, 1.0)
+  |]);
+
   TwoG.draw(0, 3, 1);
   TwoG.endPass();
   TwoG.commit();

@@ -1,5 +1,11 @@
 exception InvalidAttribute(string);
 exception InvalidTexture(string);
+exception InvalidUniform(string);
+
+/* sg_shader_stage */
+type shaderStage =
+  | Vertex
+  | Fragment;
 
 /* sg_action */
 type passAction =
@@ -8,32 +14,47 @@ type passAction =
 
 /* sg_vertex_format */
 type vertexFormat =
-  | Invalid
-  | Float
-  | Float2
-  | Float3
-  | Float4
-  | Byte4
-  | Byte4N
-  | UByte4
-  | UByte4N
-  | Short2
-  | Short2N
-  | Short4
-  | Short4N
-  | UInt10N2;
+  | IN_INVALID
+  | IN_FLOAT
+  | IN_FLOAT2
+  | IN_FLOAT3
+  | IN_FLOAT4;
 
 /* sg_image_type */
 type textureFormat =
-  | Default
-  | Sampler2D
-  | SamplerCube
-  | Sampler3D
-  | SamplerArray;
+  | TEX_DEFAULT
+  | TEX_SAMPLER2D
+  | TEX_SAMPLERCUBE
+  | TEX_SAMPLER3D
+  | TEX_SAMPLERARRAY;
+
+type uniformFormat =
+  | UNI_FLOAT
+  | UNI_FLOAT2
+  | UNI_FLOAT3
+  | UNI_FLOAT4
+  | UNI_MAT4;
+
+/* sg_uniform_type */
+type uniform =
+  | Float(float)
+  | Vec2(float, float)
+  | Vec3(float, float, float)
+  | Vec4(float, float, float, float)
+  | Mat4(array(float));
 
 type colorT = (float, float, float, float);
 type textureT = (string, textureFormat);
+type uniformDescT = (string, uniformFormat);
 type attributeT = (int, vertexFormat);
+
+/* shader desc */
+type shaderDescT = {
+  attrs: array(string),
+  textures: array(textureT),
+  vsUniforms: array(uniformDescT),
+  fsUniforms: array(uniformDescT)
+};
 
 type vertexBigarrayT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
 type indexBigarrayT = Bigarray.Array1.t(int, Bigarray.int16_unsigned_elt, Bigarray.c_layout);
@@ -50,10 +71,10 @@ let getInputName = (input: GlslOptimizer.shaderDescT) =>
 
 let toAttrFormat = (input: GlslOptimizer.shaderDescT) => {
   switch (input.basicType, input.vectorSize) {
-  | (Float, 1) => Float
-  | (Float, 2) => Float2
-  | (Float, 3) => Float3
-  | (Float, 4) => Float4
+  | (Float, 1) => IN_FLOAT
+  | (Float, 2) => IN_FLOAT2
+  | (Float, 3) => IN_FLOAT3
+  | (Float, 4) => IN_FLOAT4
   | (Float, _) =>
     raise(InvalidAttribute("Float attributes can only have dimensions of 1 to 4."))
   | (_, _) =>
@@ -63,13 +84,25 @@ let toAttrFormat = (input: GlslOptimizer.shaderDescT) => {
 
 let toTextureFormat = (basicType: GlslOptimizer.basicType) => {
   switch (basicType) {
-  | Tex2D => Sampler2D
-  | Tex3D => Sampler3D
-  | Cube => SamplerCube
-  | Array2D => SamplerArray
+  | Tex2D => TEX_SAMPLER2D
+  | Tex3D => TEX_SAMPLER3D
+  | Cube => TEX_SAMPLERCUBE
+  | Array2D => TEX_SAMPLERARRAY
   | _ =>
     raise(InvalidTexture("Sampler must be of type 2D, 3D, Cube, or 2DArray."))
   };
+};
+
+let toUniformFormat = (uniform: GlslOptimizer.shaderDescT) => {
+  switch (uniform.basicType, uniform.vectorSize, uniform.matrixSize) {
+  | (Float, 1, 1) => UNI_FLOAT
+  | (Float, 2, 1) => UNI_FLOAT2
+  | (Float, 3, 1) => UNI_FLOAT3
+  | (Float, 4, 1) => UNI_FLOAT4
+  | (Float, 1, 4) => UNI_MAT4
+  | (_, _, _) =>
+    raise(InvalidUniform("Uniforms must be of type Float."))
+  }
 };
 
 [@noalloc] external _start: unit => unit = "tg_start";
@@ -83,8 +116,7 @@ let start = (~init: unit => 't, ~frame: 't => 't) => {
 external makeShader: (
   ~vs: string,
   ~fs: string,
-  ~attrs: array(string),
-  ~textures: array(textureT)
+  ~desc: shaderDescT,
 ) => shaderT = "tg_make_shader";
 
 external makePipeline: (
@@ -103,15 +135,25 @@ let makeProgram = (~useIndex=?, ~vs, ~fs, ()) => {
   let attrs = Array.map(getInputName, inputs);
   let formats = Array.mapi((index, input) => (index, toAttrFormat(input)), inputs);
 
-  let textureSize = GlslOptimizer.getTextureLength(fragment);
-  let textures = Array.init(textureSize, index => {
+  let textures = Array.init(GlslOptimizer.getTextureLength(fragment), index => {
     let textureDesc = GlslOptimizer.getTextureDesc(fragment, index);
     (textureDesc.name, toTextureFormat(textureDesc.basicType))
   });
 
+  let vsUniforms = Array.init(GlslOptimizer.getUniformLength(vertex), index => {
+    let uniformDesc = GlslOptimizer.getUniformDesc(vertex, index);
+    (uniformDesc.name, toUniformFormat(uniformDesc))
+  });
+
+  let fsUniforms = Array.init(GlslOptimizer.getUniformLength(fragment), index => {
+    let uniformDesc = GlslOptimizer.getUniformDesc(fragment, index);
+    (uniformDesc.name, toUniformFormat(uniformDesc))
+  });
+
+  let desc = { attrs, textures, vsUniforms, fsUniforms };
   let vs = GlslOptimizer.getOutput(vertex);
   let fs = GlslOptimizer.getOutput(fragment);
-  let shader = makeShader(~vs, ~fs, ~attrs, ~textures);
+  let shader = makeShader(~vs, ~fs, ~desc);
   makePipeline(~useIndex=?useIndex, shader, formats, ());
 };
 
@@ -129,6 +171,12 @@ external applyPipeline: pipelineT => unit = "tg_apply_pipeline";
   ~indexBuffer: indexBufferT=?,
   array(vertexBufferT)
 ) => unit = "tg_apply_buffers";
+
+[@noalloc] external _applyUniforms:
+  (shaderStage, int, array(uniform)) => unit = "tg_apply_uniforms";
+
+let applyVertexUniforms = (uniforms: array(uniform)) => _applyUniforms(Vertex, 0, uniforms);
+let applyFragmentUniforms = (uniforms: array(uniform)) => _applyUniforms(Fragment, 0, uniforms);
 
 [@noalloc] external _beginPass: (colorT, bool) => unit = "tg_begin_pass";
 

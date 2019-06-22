@@ -1,6 +1,11 @@
 exception InvalidAttribute(string);
 exception InvalidTexture(string);
 
+/* sg_shader_stage */
+type shaderStage =
+  | Vertex
+  | Fragment;
+
 /* sg_action */
 type passAction =
   | Clear
@@ -33,6 +38,14 @@ type textureFormat =
   | Sampler3D
   | SamplerArray;
 
+/* sg_uniform_type */
+type uniform =
+  | Float(float)
+  | Vec2(float, float)
+  | Vec3(float, float, float)
+  | Vec4(float, float, float, float)
+  | Mat4(array(float));
+
 type colorT = (float, float, float, float);
 type textureT = (string, textureFormat);
 type attributeT = (int, vertexFormat);
@@ -58,6 +71,8 @@ let makePipeline: (~useIndex: bool=?, shaderT, array(attributeT)) => pipelineT;
 let makeProgram: (~useIndex: bool=?, ~vs: string, ~fs: string) => pipelineT;
 let applyPipeline: pipelineT => unit;
 let applyBuffers: (~indexBuffer: indexBufferT=?, array(vertexBufferT)) => unit;
+let applyVertexUniforms: array(uniform) => unit;
+let applyFragmentUniforms: array(uniform) => unit;
 let beginPass: (~clearColor: colorT=?, unit) => unit;
 let draw: (int, int, int) => unit;
 let endPass: unit => unit;

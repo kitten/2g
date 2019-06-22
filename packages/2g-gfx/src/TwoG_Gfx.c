@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -16,6 +17,72 @@
 #else
   static char* entry = "main";
 #endif
+
+/*-- uniforms --------------------------------------------------------*/
+
+int _tg_sizeof_uniform(int uniform_format) {
+  switch (uniform_format) {
+    case 0: return sizeof(float);
+    case 1: return 2 * sizeof(float);
+    case 2: return 3 * sizeof(float);
+    case 3: return 4 * sizeof(float);
+    case 4: return 16 * sizeof(float);
+    default: return 0;
+  }
+}
+
+void tg_apply_uniforms(value stage, value ub_index, value uniforms) {
+  CAMLparam3(stage, ub_index, uniforms);
+
+  int uniforms_size = Wosize_val(uniforms);
+  int byte_size = 0;
+
+  for (int i = 0; i < uniforms_size; i++) {
+    value uniform = Field(uniforms, i);
+    assert(Is_block(uniform));
+    byte_size += _tg_sizeof_uniform(Tag_val(uniform));
+  }
+
+  float* uniform_data = malloc(byte_size);
+  int data_index = 0;
+
+  for (int i = 0; i < uniforms_size; i++) {
+    value uniform = Field(uniforms, i);
+    value mat;
+
+    switch (Tag_val(uniform)) {
+      case 0:
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 0));
+        break;
+      case 1:
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 0));
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 1));
+        break;
+      case 2:
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 0));
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 1));
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 2));
+        break;
+      case 3:
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 0));
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 1));
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 2));
+        uniform_data[data_index++] = (float) Double_val(Field(uniform, 3));
+        break;
+      case 4:
+        mat = Field(uniform, 0);
+        assert(Wosize_val(mat) / Double_wosize == 16);
+        for (int mat_i = 0; i < 16; i++) {
+          uniform_data[data_index++] = (float) Double_field(mat, mat_i);
+        }
+
+        break;
+    }
+  }
+
+  sg_apply_uniforms(Int_val(stage), Int_val(ub_index), uniform_data, byte_size);
+  free(uniform_data);
+}
 
 /*-- sg_buffer --------------------------------------------------------*/
 
@@ -96,8 +163,19 @@ static value _tg_copy_shader(sg_shader* shader) {
   CAMLreturn(val);
 }
 
-CAMLprim value tg_make_shader(value vs, value fs, value attrs, value textures) {
-  CAMLparam3(vs, fs, attrs);
+enum sg_uniform_type _tg_to_uniform_type(int format) {
+  switch (format) {
+    case 0: return SG_UNIFORMTYPE_FLOAT;
+    case 1: return SG_UNIFORMTYPE_FLOAT2;
+    case 2: return SG_UNIFORMTYPE_FLOAT3;
+    case 3: return SG_UNIFORMTYPE_FLOAT4;
+    case 4: return SG_UNIFORMTYPE_MAT4;
+    default: return SG_UNIFORMTYPE_INVALID;
+  }
+}
+
+CAMLprim value tg_make_shader(value vs, value fs, value desc) {
+  CAMLparam3(vs, fs, desc);
   CAMLlocal1(ret);
 
   sg_shader_desc shader_desc = {
@@ -111,15 +189,50 @@ CAMLprim value tg_make_shader(value vs, value fs, value attrs, value textures) {
     },
   };
 
-  int attrs_size = Wosize_val(attrs);
-  for (int i = 0; i < attrs_size; i++) {
-    shader_desc.attrs[i].name = String_val(Field(attrs, i));
-  }
+  if (desc != Val_none) {
+    value attrs = Field(desc, 0);
+    value textures = Field(desc, 1);
+    value vs_uniforms = Field(desc, 2);
+    value fs_uniforms = Field(desc, 3);
 
-  int textures_size = Wosize_val(textures);
-  for (int i = 0; i < textures_size; i++) {
-    shader_desc.fs.images[i].name = String_val(Field(Field(attrs, i), 0));
-    shader_desc.fs.images[i].type = Int_val(Field(Field(attrs, i), 1));
+    int attrs_size = Wosize_val(attrs);
+    for (int i = 0; i < attrs_size; i++) {
+      shader_desc.attrs[i].name = String_val(Field(attrs, i));
+    }
+
+    int textures_size = Wosize_val(textures);
+    for (int i = 0; i < textures_size; i++) {
+      shader_desc.fs.images[i].name = String_val(Field(Field(attrs, i), 0));
+      shader_desc.fs.images[i].type = Int_val(Field(Field(attrs, i), 1));
+    }
+
+    int vs_uniforms_size = Wosize_val(vs_uniforms);
+    if (vs_uniforms_size != 0) {
+      sg_shader_uniform_block_desc vs_block = { .size = 0 };
+      for (int i = 0; i < vs_uniforms_size; i++) {
+        value uniform = Field(vs_uniforms, i);
+        int format = Int_val(Field(uniform, 1));
+        vs_block.size += _tg_sizeof_uniform(format);
+        vs_block.uniforms[i].type = _tg_to_uniform_type(format);
+        vs_block.uniforms[i].name = String_val(Field(uniform, 0));
+      }
+
+      shader_desc.vs.uniform_blocks[0] = vs_block;
+    }
+
+    int fs_uniforms_size = Wosize_val(fs_uniforms);
+    if (fs_uniforms_size != 0) {
+      sg_shader_uniform_block_desc fs_block = { .size = 0 };
+      for (int i = 0; i < fs_uniforms_size; i++) {
+        value uniform = Field(fs_uniforms, i);
+        int format = Int_val(Field(uniform, 1));
+        fs_block.size += _tg_sizeof_uniform(format);
+        fs_block.uniforms[i].type = _tg_to_uniform_type(format);
+        fs_block.uniforms[i].name = String_val(Field(uniform, 0));
+      }
+
+      shader_desc.fs.uniform_blocks[0] = fs_block;
+    }
   }
 
   sg_shader shader = sg_make_shader(&shader_desc);
