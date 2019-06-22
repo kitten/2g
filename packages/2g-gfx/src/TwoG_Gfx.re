@@ -1,3 +1,5 @@
+exception UnknownAttrFormat;
+
 /* sg_vertex_format */
 type vertexFormat =
   | Invalid
@@ -27,9 +29,8 @@ module Internals = {
   [@noalloc] external start: unit => unit = "tg_start";
 
   external makeBuffer: bufferDescT => bufferT = "tg_make_buffer";
-  external makeShader: (~vs: string, ~fs: string) => shaderT = "tg_make_shader";
-
-  external makePipeline: shaderT => pipelineT = "tg_make_pipeline";
+  external makeShader: (string, string, array(string)) => shaderT = "tg_make_shader";
+  external makePipeline: (shaderT, array(vertexFormat)) => pipelineT = "tg_make_pipeline";
   external makeBindings: bufferT => bindingsT = "tg_make_bindings";
 
   external applyPipeline: pipelineT => unit = "tg_apply_pipeline";
@@ -40,44 +41,44 @@ module Internals = {
   [@noalloc] external draw: (int, int, int) => unit = "tg_draw";
   [@noalloc] external endPass: unit => unit = "tg_end_pass";
   [@noalloc] external commit: unit => unit = "tg_commit";
+
+  let getInputName = (input: GlslOptimizer.shaderDescT) =>
+    input.name;
+
+  let toAttrFormat = (input: GlslOptimizer.shaderDescT) => {
+    switch (input.basicType, input.vectorSize) {
+    | (Float, 1) => Float
+    | (Float, 2) => Float2
+    | (Float, 3) => Float3
+    | (Float, 4) => Float4
+    | _ => raise(UnknownAttrFormat)
+    };
+  }
 };
 
-let start = (
-  ~init: unit => 't,
-  ~frame: 't => 't
-) => {
+let start = (~init: unit => 't, ~frame: 't => 't) => {
   Callback.register("tg_init_cb", init);
   Callback.register("tg_frame_cb", frame);
   Internals.start();
 };
 
-let pragmaVersionRe = Str.regexp("#version 300 es");
+let makeProgram = (~vs, ~fs) => {
+  let vertex = GlslOptimizer.convertShader(Vertex, vs);
+  let fragment = GlslOptimizer.convertShader(Fragment, fs);
+  let inputSize = GlslOptimizer.getInputLength(vertex);
+  let inputs = Array.init(inputSize, GlslOptimizer.getInputDesc(vertex));
 
-let pragmaVersionTarget = switch (GlslOptimizer.getTarget()) {
-| OpenGL => "#version 330"
-| OpenGLES2 => "#version 200 es"
-| OpenGLES3 => "#version 300 es"
-| Metal => ""
-};
+  let attrs = Array.map(Internals.getInputName, inputs);
+  let formats = Array.map(Internals.toAttrFormat, inputs);
 
-let makeShader = (~vs, ~fs) => {
-  let fixVersionPragma = Str.replace_first(pragmaVersionRe, pragmaVersionTarget);
+  let vs = GlslOptimizer.getOutput(vertex);
+  let fs = GlslOptimizer.getOutput(fragment);
+  let shader = Internals.makeShader(vs, fs, attrs);
 
-  let vs = vs
-    |> GlslOptimizer.convertShader(Vertex)
-    |> GlslOptimizer.getOutput
-    |> fixVersionPragma;
-
-  let fs = fs
-    |> GlslOptimizer.convertShader(Fragment)
-    |> GlslOptimizer.getOutput
-    |> fixVersionPragma;
-
-  Internals.makeShader(~vs, ~fs);
+  Internals.makePipeline(shader, formats);
 };
 
 let makeBuffer = Internals.makeBuffer;
-let makePipeline = Internals.makePipeline;
 let makeBindings = Internals.makeBindings;
 let applyPipeline = Internals.applyPipeline;
 let applyBindings = Internals.applyBindings;

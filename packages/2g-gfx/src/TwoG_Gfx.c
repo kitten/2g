@@ -79,15 +79,11 @@ static value _tg_copy_shader(sg_shader* shader) {
   CAMLreturn(val);
 }
 
-CAMLprim value tg_make_shader(value vs, value fs) {
-  CAMLparam2(vs, fs);
+CAMLprim value tg_make_shader(value vs, value fs, value attrs) {
+  CAMLparam3(vs, fs, attrs);
   CAMLlocal1(ret);
 
-  sg_shader shader = sg_make_shader(&(sg_shader_desc){
-    .attrs = {
-      [0].name = "position",
-      [1].name = "color",
-    },
+  sg_shader_desc shader_desc = {
     .vs = {
       .source = String_val(vs),
       .entry = entry,
@@ -96,8 +92,14 @@ CAMLprim value tg_make_shader(value vs, value fs) {
       .source = String_val(fs),
       .entry = entry,
     },
-  });
+  };
 
+  int attrs_size = Wosize_val(attrs);
+  for (int i = 0; i < attrs_size; i++) {
+    shader_desc.attrs[i].name = String_val(Field(attrs, i));
+  }
+
+  sg_shader shader = sg_make_shader(&shader_desc);
   ret = _tg_copy_shader(&shader);
   CAMLreturn(ret);
 }
@@ -128,21 +130,19 @@ static value _tg_copy_pipeline(sg_pipeline* pipeline) {
   CAMLreturn(val);
 }
 
-CAMLprim value tg_make_pipeline(value shader) {
-  CAMLparam1(shader);
+CAMLprim value tg_make_pipeline(value shader, value formats) {
+  CAMLparam2(shader, formats);
   CAMLlocal1(ret);
 
   sg_shader shader_val = *(sg_shader *) Data_custom_val(shader);
-  sg_pipeline pipeline = sg_make_pipeline(&(sg_pipeline_desc){
-    .shader = shader_val,
-    .layout = {
-      .attrs = {
-        [0].format = SG_VERTEXFORMAT_FLOAT3,
-        [1].format = SG_VERTEXFORMAT_FLOAT4
-      }
-    }
-  });
+  sg_pipeline_desc pipeline_desc = { .shader = shader_val };
 
+  int formats_size = Wosize_val(formats);
+  for (int i = 0; i < formats_size; i++) {
+    pipeline_desc.layout.attrs[i].format = Int_val(Field(formats, i));
+  }
+
+  sg_pipeline pipeline = sg_make_pipeline(&pipeline_desc);
   ret = _tg_copy_pipeline(&pipeline);
   CAMLreturn(ret);
 }
@@ -215,7 +215,7 @@ void _tg_event(const sapp_event* evt) {
 }
 
 void _tg_fail(const char* msg) {
-  printf("TG Fatal Error: %s", msg);
+  printf("2G Fatal Error: %s", msg);
 }
 
 void tg_start() {
@@ -236,7 +236,6 @@ void tg_start() {
     .gl_force_gles2 = sapp_gles2(),
     .width = 800,
     .height = 600,
-    .high_dpi = true,
     .window_title = "Reason TG"
   });
 }

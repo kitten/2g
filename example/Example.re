@@ -3,12 +3,12 @@ module TwoG = TwoG_Gfx;
 let vs = {|
   #version 300 es
 
-  in vec4 position;
+  in vec3 position;
   in vec4 color;
   out vec4 out_color;
 
   void main() {
-    gl_Position = position;
+    gl_Position = vec4(position.xyz, 1);
     out_color = color;
   }
 |};
@@ -36,17 +36,16 @@ let init = () => {
 
   let buffer = TwoG.makeBuffer(vertices);
   let bindings = TwoG.makeBindings(buffer);
-  let shader = TwoG.makeShader(~vs, ~fs);
-  let pipeline = TwoG.makePipeline(shader);
+  let program = TwoG.makeProgram(~vs, ~fs);
 
-  (bindings, pipeline)
+  (bindings, program)
 };
 
 let frame = (state) => {
-  let (bindings, pipeline) = state;
+  let (bindings, program) = state;
 
   TwoG.beginPass();
-  TwoG.applyPipeline(pipeline);
+  TwoG.applyPipeline(program);
   TwoG.applyBindings(bindings);
   TwoG.draw(0, 3, 1);
   TwoG.endPass();

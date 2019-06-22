@@ -84,3 +84,108 @@ CAMLprim value tg_get_output(value shader) {
   str = caml_copy_string(output);
   CAMLreturn(str);
 }
+
+CAMLprim value tg_get_input_length(value shaderV) {
+  CAMLparam1(shaderV);
+  CAMLlocal1(count);
+  glslopt_shader* shader = *((glslopt_shader **) Data_custom_val(shaderV));
+  count = Val_int(glslopt_shader_get_input_count(shader));
+  CAMLreturn(count);
+}
+
+CAMLprim value tg_get_uniform_length(value shaderV) {
+  CAMLparam1(shaderV);
+  CAMLlocal1(count);
+  glslopt_shader* shader = *((glslopt_shader **) Data_custom_val(shaderV));
+  count = Val_int(glslopt_shader_get_uniform_count(shader));
+  CAMLreturn(count);
+}
+
+CAMLprim value tg_get_texture_length(value shaderV) {
+  CAMLparam1(shaderV);
+  CAMLlocal1(count);
+  glslopt_shader* shader = *((glslopt_shader **) Data_custom_val(shaderV));
+  count = Val_int(glslopt_shader_get_texture_count(shader));
+  CAMLreturn(count);
+}
+
+CAMLprim value tg_get_input_desc(value shaderV, value index) {
+  CAMLparam2(shaderV, index);
+  CAMLlocal1(input);
+
+  glslopt_shader* shader = *((glslopt_shader **) Data_custom_val(shaderV));
+
+  const char* name;
+  enum glslopt_basic_type type;
+  enum glslopt_precision prec;
+  int vecSize, matSize, arrSize, location;
+
+  glslopt_shader_get_input_desc(
+    shader, Int_val(index),
+    &name, &type, &prec, &vecSize, &matSize, &arrSize, &location
+  );
+
+  input = caml_alloc(7, 0);
+  Store_field(input, 0, caml_copy_string(name));
+  Store_field(input, 1, Val_int(type));
+  Store_field(input, 2, Val_int(prec));
+  Store_field(input, 3, Val_int(vecSize));
+  Store_field(input, 4, Val_int(matSize));
+  Store_field(input, 5, Val_int(arrSize));
+  Store_field(input, 6, Val_int(location));
+  CAMLreturn(input);
+}
+
+CAMLprim value tg_get_uniform_desc(value shaderV, value index) {
+  CAMLparam2(shaderV, index);
+  CAMLlocal1(input);
+
+  glslopt_shader* shader = *((glslopt_shader **) Data_custom_val(shaderV));
+
+  const char* name;
+  enum glslopt_basic_type type;
+  enum glslopt_precision prec;
+  int vecSize, matSize, arrSize, location;
+
+  glslopt_shader_get_uniform_desc(
+    shader, Int_val(index),
+    &name, &type, &prec, &vecSize, &matSize, &arrSize, &location
+  );
+
+  input = caml_alloc(7, 0);
+  Store_field(input, 0, caml_copy_string(name));
+  Store_field(input, 1, Val_int(type));
+  Store_field(input, 2, Val_int(prec));
+  Store_field(input, 3, Val_int(vecSize));
+  Store_field(input, 4, Val_int(matSize));
+  Store_field(input, 5, Val_int(arrSize));
+  Store_field(input, 6, Val_int(location));
+  CAMLreturn(input);
+}
+
+CAMLprim value tg_get_texture_desc(value shaderV, value index) {
+  CAMLparam2(shaderV, index);
+  CAMLlocal1(input);
+
+  glslopt_shader* shader = *((glslopt_shader **) Data_custom_val(shaderV));
+
+  const char* name;
+  enum glslopt_basic_type type;
+  enum glslopt_precision prec;
+  int vecSize, matSize, arrSize, location;
+
+  glslopt_shader_get_texture_desc(
+    shader, Int_val(index),
+    &name, &type, &prec, &vecSize, &matSize, &arrSize, &location
+  );
+
+  input = caml_alloc(7, 0);
+  Store_field(input, 0, caml_copy_string(name));
+  Store_field(input, 1, Val_int(type));
+  Store_field(input, 2, Val_int(prec));
+  Store_field(input, 3, Val_int(vecSize));
+  Store_field(input, 4, Val_int(matSize));
+  Store_field(input, 5, Val_int(arrSize));
+  Store_field(input, 6, Val_int(location));
+  CAMLreturn(input);
+}
