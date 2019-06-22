@@ -35,7 +35,7 @@ typedef struct {} glslopt_ctx;
 #endif
 
 enum glslopt_shader_type {
-	kGlslOptShaderVertex = 0,
+	kGlslOptShaderVertex,
 	kGlslOptShaderFragment,
 };
 

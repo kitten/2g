@@ -1,12 +1,19 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
+#include <caml/custom.h>
 #include <caml/memory.h>
 #include <caml/alloc.h>
 #include <caml/mlvalues.h>
 
 #include "glsl/glsl_optimizer.h"
+
+static glslopt_ctx* ctx = NULL;
+static enum glslopt_options opts = kGlslOptionSkipPreprocessor;
+
+/*-- glslopt_target --------------------------------------------------------*/
 
 #if defined(__APPLE__)
   static enum glslopt_target target = kGlslTargetMetal;
@@ -14,53 +21,66 @@
   static enum glslopt_target target = kGlslTargetOpenGL;
 #endif
 
-static enum glslopt_options opts = kGlslOptionSkipPreprocessor;
-static glslopt_ctx* ctx = NULL;
-
-int glsl_target() {
-  return target;
+CAMLprim value tg_target() {
+  CAMLparam0();
+  CAMLreturn(Val_int(target));
 }
 
-const char* glsl_convert(char* source, enum glslopt_shader_type type) {
+/*-- glslopt_shader --------------------------------------------------------*/
+
+void _tg_finalize_glslopt_shader(value v) {
+  glslopt_shader* shader = *((glslopt_shader **) Data_custom_val(v));
+  glslopt_shader_delete(shader);
+}
+
+static struct custom_operations tg_glslopt_shader = {
+  .identifier = "glslopt_shader",
+  .finalize = _tg_finalize_glslopt_shader,
+  .compare = custom_compare_default,
+  .hash = custom_hash_default,
+  .serialize = custom_serialize_default,
+  .deserialize = custom_deserialize_default,
+};
+
+static value _tg_copy_glslopt_shader(glslopt_shader* shader) {
+  CAMLparam0();
+  CAMLlocal1(val);
+
+  // The custom block itself only contains the pointer to glslopt_shader
+  val = caml_alloc_custom(&tg_glslopt_shader, sizeof(glslopt_shader*), 0, 1);
+  memcpy(Data_custom_val(val), &shader, sizeof(glslopt_shader*));
+
+  CAMLreturn(val);
+}
+
+/*-- glslopt_optimize --------------------------------------------------------*/
+
+CAMLprim value tg_convert_shader(value type, value source) {
+  CAMLparam2(type, source);
+  CAMLlocal1(ret);
   if (ctx == NULL) {
     ctx = glslopt_initialize(target);
   }
 
-  glslopt_shader* shader = glslopt_optimize(ctx, type, source, opts);
+  enum glslopt_shader_type glslopt_type = Int_val(type);
+  const char* source_str = String_val(source);
 
-  const char* transformed = NULL;
-  if (glslopt_get_status(shader)) {
-    transformed = glslopt_get_output(shader);
-  } else {
+  glslopt_shader* shader = glslopt_optimize(ctx, glslopt_type, source_str, opts);
+  if (!glslopt_get_status(shader)) {
     puts("Shader failed to compile!");
 		puts(glslopt_get_log(shader));
     assert(false);
-	}
+  }
 
-  glslopt_shader_delete(shader);
-  return transformed;
+  ret = _tg_copy_glslopt_shader(shader);
+  CAMLreturn(ret);
 }
 
-const char* glsl_convert_vertex(char* source) {
-  return glsl_convert(source, kGlslOptShaderVertex);
-}
-
-const char* glsl_convert_fragment(char* source) {
-  return glsl_convert(source, kGlslOptShaderFragment);
-}
-
-CAMLprim value tg_target() {
-  return Val_int(glsl_target());
-}
-
-CAMLprim value tg_convert_vertex(value vs) {
-  CAMLparam1(vs);
-  char* vs_opt = (char*) glsl_convert_vertex(String_val(vs));
-  return caml_copy_string(vs_opt);
-}
-
-CAMLprim value tg_convert_fragment(value fs) {
-  CAMLparam1(fs);
-  char* fs_opt = (char*) glsl_convert_fragment(String_val(fs));
-  return caml_copy_string(fs_opt);
+CAMLprim value tg_get_output(value shader) {
+  CAMLparam1(shader);
+  CAMLlocal1(str);
+  glslopt_shader* shader_val = *((glslopt_shader **) Data_custom_val(shader));
+  const char* output = glslopt_get_output(shader_val);
+  str = caml_copy_string(output);
+  CAMLreturn(str);
 }

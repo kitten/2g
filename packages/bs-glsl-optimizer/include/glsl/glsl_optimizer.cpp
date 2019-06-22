@@ -151,21 +151,21 @@ struct glslopt_shader
 		, statsFlow(0)
 	{
 		infoLog = "Shader not compiled yet";
-		
+
 		whole_program = rzalloc (NULL, struct gl_shader_program);
 		assert(whole_program != NULL);
 		whole_program->InfoLog = ralloc_strdup(whole_program, "");
-		
+
 		whole_program->Shaders = reralloc(whole_program, whole_program->Shaders, struct gl_shader *, whole_program->NumShaders + 1);
 		assert(whole_program->Shaders != NULL);
-		
+
 		shader = rzalloc(whole_program, gl_shader);
 		whole_program->Shaders[whole_program->NumShaders] = shader;
 		whole_program->NumShaders++;
-		
-		whole_program->LinkStatus = true;		
+
+		whole_program->LinkStatus = true;
 	}
-	
+
 	~glslopt_shader()
 	{
 		for (unsigned i = 0; i < MESA_SHADER_STAGES; i++)
@@ -174,7 +174,7 @@ struct glslopt_shader
 		ralloc_free(rawOutput);
 		ralloc_free(optimizedOutput);
 	}
-	
+
 	struct gl_shader_program* whole_program;
 	struct gl_shader* shader;
 
@@ -223,7 +223,7 @@ static void propagate_precision_deref(ir_instruction *ir, void *data)
 		der->set_precision ((glsl_precision)der->var->data.precision);
 		((precision_ctx*)data)->res = true;
 	}
-	
+
 	// array deref with undefined precision: take from array itself
 	ir_dereference_array* der_arr = ir->as_dereference_array();
 	if (der_arr && der_arr->get_precision() == glsl_precision_undefined && der_arr->array->get_precision() != glsl_precision_undefined)
@@ -231,7 +231,7 @@ static void propagate_precision_deref(ir_instruction *ir, void *data)
 		der_arr->set_precision (der_arr->array->get_precision());
 		((precision_ctx*)data)->res = true;
 	}
-	
+
 	// swizzle with undefined precision: take from swizzle argument
 	ir_swizzle* swz = ir->as_swizzle();
 	if (swz && swz->get_precision() == glsl_precision_undefined && swz->val->get_precision() != glsl_precision_undefined)
@@ -239,7 +239,7 @@ static void propagate_precision_deref(ir_instruction *ir, void *data)
 		swz->set_precision (swz->val->get_precision());
 		((precision_ctx*)data)->res = true;
 	}
-	
+
 }
 
 static void propagate_precision_expr(ir_instruction *ir, void *data)
@@ -249,7 +249,7 @@ static void propagate_precision_expr(ir_instruction *ir, void *data)
 		return;
 	if (expr->get_precision() != glsl_precision_undefined)
 		return;
-	
+
 	glsl_precision prec_params_max = glsl_precision_undefined;
 	for (int i = 0; i < (int)expr->get_num_operands(); ++i)
 	{
@@ -262,7 +262,7 @@ static void propagate_precision_expr(ir_instruction *ir, void *data)
 		expr->set_precision (prec_params_max);
 		((precision_ctx*)data)->res = true;
 	}
-	
+
 }
 
 static void propagate_precision_texture(ir_instruction *ir, void *data)
@@ -315,7 +315,7 @@ static void propagate_precision_assign(ir_instruction *ir, void *data)
 	{
 		ir_variable* lhs_var = ass->lhs->variable_referenced();
 		if (lp == glsl_precision_undefined)
-		{		
+		{
 			if (lhs_var)
 				lhs_var->data.precision = rp;
 			ass->lhs->set_precision (rp);
@@ -323,7 +323,7 @@ static void propagate_precision_assign(ir_instruction *ir, void *data)
 		}
 		return;
 	}
-	
+
 	// for assignments where LHS has precision, but RHS is a temporary variable
 	// with undefined precision that's only assigned from other undefined precision
 	// sources -> make the RHS variable take LHS precision
@@ -371,11 +371,11 @@ static void propagate_precision_call(ir_instruction *ir, void *data)
 						  actual_node, &call->actual_parameters) {
 			ir_variable* sig_param = (ir_variable*)formal_node;
 			ir_rvalue* param = (ir_rvalue*)actual_node;
-			
+
 			glsl_precision p = (glsl_precision)sig_param->data.precision;
 			if (p == glsl_precision_undefined)
 				p = param->get_precision();
-			
+
 			prec_params_max = higher_precision (prec_params_max, p);
 		}
 		if (call->return_deref->get_precision() != prec_params_max)
@@ -390,7 +390,7 @@ static bool propagate_precision(exec_list* list, bool assign_high_to_undefined)
 {
 	bool anyProgress = false;
 	precision_ctx ctx;
-	
+
 	do {
 		ctx.res = false;
 		ctx.root_ir = list;
@@ -415,7 +415,7 @@ static bool propagate_precision(exec_list* list, bool assign_high_to_undefined)
 		anyProgress |= ctx.res;
 	} while (ctx.res);
 	anyProgress |= ctx.res;
-	
+
 	// for globals that have undefined precision, set it to highp
 	if (assign_high_to_undefined)
 	{
@@ -432,7 +432,7 @@ static bool propagate_precision(exec_list* list, bool assign_high_to_undefined)
 			}
 		}
 	}
-	
+
 	return anyProgress;
 }
 
@@ -544,11 +544,11 @@ static void glsl_type_to_optimizer_desc(const glsl_type* type, glsl_precision pr
 	}
 	else
 		out->type = kGlslTypeOther;
-	
+
 	// sizes
 	out->vectorSize = type->vector_elements;
 	out->matrixSize = type->matrix_columns;
-	
+
 	// precision
 	switch (prec)
 	{
@@ -581,7 +581,7 @@ static void find_shader_variables(glslopt_shader* sh, exec_list* ir)
 		{
 			if (sh->uniformCount >= glslopt_shader::kMaxShaderUniforms)
 				continue;
-			
+
 			glslopt_shader_var& v = sh->uniforms[sh->uniformCount];
 			v.name = ralloc_strdup(sh, var->name);
 			glsl_type_to_optimizer_desc(var->type, (glsl_precision)var->data.precision, &v);
@@ -592,7 +592,7 @@ static void find_shader_variables(glslopt_shader* sh, exec_list* ir)
 		{
 			if (sh->textureCount >= glslopt_shader::kMaxShaderTextures)
 				continue;
-			
+
 			glslopt_shader_var& v = sh->textures[sh->textureCount];
 			v.name = ralloc_strdup(sh, var->name);
 			glsl_type_to_optimizer_desc(var->type, (glsl_precision)var->data.precision, &v);
@@ -661,11 +661,11 @@ glslopt_shader* glslopt_optimize (glslopt_ctx* ctx, glslopt_shader_type type, co
 		else
 			shader->rawOutput = _mesa_print_ir_glsl(ir, state, ralloc_strdup(shader, ""), printMode);
 	}
-	
+
 	// Link built-in functions
 	shader->shader->symbols = state->symbols;
 	shader->shader->uses_builtin_functions = state->uses_builtin_functions;
-	
+
 	struct gl_shader* linked_shader = NULL;
 
 	if (!state->error && !ir->is_empty() && !(options & kGlslOptionNotFullShader))
@@ -682,18 +682,18 @@ glslopt_shader* glslopt_optimize (glslopt_ctx* ctx, glslopt_shader_type type, co
 			return shader;
 		}
 		ir = linked_shader->ir;
-		
+
 		debug_print_ir ("==== After link ====", ir, state, shader);
 	}
-	
+
 	// Do optimization post-link
 	if (!state->error && !ir->is_empty())
-	{		
+	{
 		const bool linked = !(options & kGlslOptionNotFullShader);
 		do_optimization_passes(ir, linked, state, shader);
 		validate_ir_tree(ir);
-	}	
-	
+	}
+
 	// Final optimized output
 	if (!state->error)
 	{

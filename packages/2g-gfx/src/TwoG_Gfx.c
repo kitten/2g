@@ -7,7 +7,7 @@
 #include <caml/mlvalues.h>
 #include <caml/bigarray.h>
 
-#include "sokol/sokol.h"
+#include "sokol.h"
 
 #if defined(SOKOL_METAL)
   static char* entry = "xlatMtlMain";
@@ -179,7 +179,6 @@ typedef struct {
 
 static value* frame_callback = NULL;
 static value* init_callback = NULL;
-static value* user_state = NULL;
 
 void _tg_init(void* data) {
   loadGraphics();
@@ -237,6 +236,7 @@ void tg_start() {
     .gl_force_gles2 = sapp_gles2(),
     .width = 800,
     .height = 600,
+    .high_dpi = true,
     .window_title = "Reason TG"
   });
 }
