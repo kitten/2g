@@ -34,24 +34,20 @@ type textureFormat =
   | SamplerArray;
 
 type colorT = (float, float, float, float);
+type textureT = (string, textureFormat);
 
-type textureT = {
-  name: string,
-  format: textureFormat
-};
-
-type bufferDescT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
+type bigarrayT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
 type bufferT;
 type shaderT;
 type pipelineT;
 type bindingsT;
 
-let bufferOfBigarray: bufferDescT => bufferT;
+let bufferOfBigarray: bigarrayT => bufferT;
 let bufferOfArray: array(float) => bufferT;
 
 let start: (~init: unit => 't, ~frame: 't => 't) => unit;
 let makeShader: (~vs: string, ~fs: string, ~attrs: array(string)) => pipelineT;
-let makePipeline: (shaderT, array(vertexFormat)) => pipelineT;
+let makePipeline: (shaderT, array(attributeT)) => pipelineT;
 let makeProgram: (~vs: string, ~fs: string) => pipelineT;
 let applyPipeline: pipelineT => unit;
 let applyBuffers: (~indexBuffer: bufferT=?, array(bufferT)) => unit;

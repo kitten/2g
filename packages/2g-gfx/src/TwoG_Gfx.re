@@ -32,11 +32,8 @@ type textureFormat =
   | SamplerArray;
 
 type colorT = (float, float, float, float);
-
-type textureT = {
-  name: string,
-  format: textureFormat
-};
+type textureT = (string, textureFormat);
+type attributeT = (int, vertexFormat);
 
 type bigarrayT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
 
@@ -87,7 +84,7 @@ external makeShader: (
   ~textures: array(textureT)
 ) => shaderT = "tg_make_shader";
 
-external makePipeline: (shaderT, array(vertexFormat)) => pipelineT = "tg_make_pipeline";
+external makePipeline: (shaderT, array(attributeT)) => pipelineT = "tg_make_pipeline";
 
 let makeProgram = (~vs, ~fs) => {
   let vertex = GlslOptimizer.convertShader(Vertex, vs);
@@ -96,13 +93,12 @@ let makeProgram = (~vs, ~fs) => {
   let inputSize = GlslOptimizer.getInputLength(vertex);
   let inputs = Array.init(inputSize, GlslOptimizer.getInputDesc(vertex));
   let attrs = Array.map(getInputName, inputs);
-  let formats = Array.map(toAttrFormat, inputs);
+  let formats = Array.mapi((index, input) => (index, toAttrFormat(input)), inputs);
 
   let textureSize = GlslOptimizer.getTextureLength(fragment);
   let textures = Array.init(textureSize, index => {
     let textureDesc = GlslOptimizer.getTextureDesc(fragment, index);
-    let format = toTextureFormat(textureDesc.basicType);
-    { name: textureDesc.name, format }
+    (textureDesc.name, toTextureFormat(textureDesc.basicType))
   });
 
   let vs = GlslOptimizer.getOutput(vertex);

@@ -147,8 +147,9 @@ CAMLprim value tg_make_pipeline(value shader, value formats) {
 
   int formats_size = Wosize_val(formats);
   for (int i = 0; i < formats_size; i++) {
-    pipeline_desc.layout.attrs[i].buffer_index = i;
-    pipeline_desc.layout.attrs[i].format = Int_val(Field(formats, i));
+    value format = Field(formats, i);
+    pipeline_desc.layout.attrs[i].buffer_index = Int_val(Field(format, 0));
+    pipeline_desc.layout.attrs[i].format = Int_val(Field(format, 1));
   }
 
   sg_pipeline pipeline = sg_make_pipeline(&pipeline_desc);
