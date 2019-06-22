@@ -35,9 +35,12 @@ type colorT = (float, float, float, float);
 type textureT = (string, textureFormat);
 type attributeT = (int, vertexFormat);
 
-type bigarrayT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
+type vertexBigarrayT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
+type indexBigarrayT = Bigarray.Array1.t(int, Bigarray.int16_unsigned_elt, Bigarray.c_layout);
 
-type bufferT;
+type vertexBufferT;
+type indexBufferT;
+
 type shaderT;
 type pipelineT;
 type bindingsT;
@@ -84,9 +87,14 @@ external makeShader: (
   ~textures: array(textureT)
 ) => shaderT = "tg_make_shader";
 
-external makePipeline: (shaderT, array(attributeT)) => pipelineT = "tg_make_pipeline";
+external makePipeline: (
+  ~useIndex: bool=?,
+  shaderT,
+  array(attributeT),
+  unit
+) => pipelineT = "tg_make_pipeline";
 
-let makeProgram = (~vs, ~fs) => {
+let makeProgram = (~useIndex=?, ~vs, ~fs, ()) => {
   let vertex = GlslOptimizer.convertShader(Vertex, vs);
   let fragment = GlslOptimizer.convertShader(Fragment, fs);
 
@@ -104,22 +112,22 @@ let makeProgram = (~vs, ~fs) => {
   let vs = GlslOptimizer.getOutput(vertex);
   let fs = GlslOptimizer.getOutput(fragment);
   let shader = makeShader(~vs, ~fs, ~attrs, ~textures);
-
-  makePipeline(shader, formats);
+  makePipeline(~useIndex=?useIndex, shader, formats, ());
 };
 
-external bufferOfBigarray: bigarrayT => bufferT = "tg_make_buffer";
+external makeVertexBuffer: vertexBigarrayT => vertexBufferT = "tg_make_vertex_buffer";
+external makeIndexBuffer: indexBigarrayT => indexBufferT = "tg_make_index_buffer";
 
-let bufferOfArray = (data: array(float)) => {
-  Bigarray.Array1.of_array(Float32, C_layout, data)
-    |> bufferOfBigarray
-};
+let vertexBufferOfArray = (data: array(float)) =>
+  makeVertexBuffer(Bigarray.Array1.of_array(Float32, C_layout, data));
+let indexBufferOfArray = (data: array(int)) =>
+  makeIndexBuffer(Bigarray.Array1.of_array(Int16_unsigned, C_layout, data));
 
 external applyPipeline: pipelineT => unit = "tg_apply_pipeline";
 
 [@noalloc] external applyBuffers: (
-  ~indexBuffer: bufferT=?,
-  array(bufferT)
+  ~indexBuffer: indexBufferT=?,
+  array(vertexBufferT)
 ) => unit = "tg_apply_buffers";
 
 [@noalloc] external _beginPass: (colorT, bool) => unit = "tg_begin_pass";

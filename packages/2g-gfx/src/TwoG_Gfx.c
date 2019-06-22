@@ -43,11 +43,26 @@ static value _tg_copy_buffer(sg_buffer* buffer) {
   CAMLreturn(val);
 }
 
-CAMLprim value tg_make_buffer(value data) {
+CAMLprim value tg_make_vertex_buffer(value data) {
   CAMLparam1(data);
   CAMLlocal1(ret);
 
   sg_buffer buffer = sg_make_buffer(&(sg_buffer_desc){
+    .type = SG_BUFFERTYPE_VERTEXBUFFER,
+    .size = caml_ba_byte_size(Caml_ba_array_val(data)),
+    .content = Caml_ba_data_val(data),
+  });
+
+  ret = _tg_copy_buffer(&buffer);
+  CAMLreturn(ret);
+}
+
+CAMLprim value tg_make_index_buffer(value data) {
+  CAMLparam1(data);
+  CAMLlocal1(ret);
+
+  sg_buffer buffer = sg_make_buffer(&(sg_buffer_desc){
+    .type = SG_BUFFERTYPE_INDEXBUFFER,
     .size = caml_ba_byte_size(Caml_ba_array_val(data)),
     .content = Caml_ba_data_val(data),
   });
@@ -138,8 +153,8 @@ static value _tg_copy_pipeline(sg_pipeline* pipeline) {
   CAMLreturn(val);
 }
 
-CAMLprim value tg_make_pipeline(value shader, value formats) {
-  CAMLparam2(shader, formats);
+CAMLprim value tg_make_pipeline(value index, value shader, value formats) {
+  CAMLparam3(index, shader, formats);
   CAMLlocal1(ret);
 
   sg_shader shader_val = *(sg_shader *) Data_custom_val(shader);
@@ -150,6 +165,10 @@ CAMLprim value tg_make_pipeline(value shader, value formats) {
     value format = Field(formats, i);
     pipeline_desc.layout.attrs[i].buffer_index = Int_val(Field(format, 0));
     pipeline_desc.layout.attrs[i].format = Int_val(Field(format, 1));
+  }
+
+  if (index == Val_true) {
+    pipeline_desc.index_type = SG_INDEXTYPE_UINT16;
   }
 
   sg_pipeline pipeline = sg_make_pipeline(&pipeline_desc);

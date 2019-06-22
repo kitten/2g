@@ -25,19 +25,19 @@ let fs = {|
 |};
 
 let init = () => {
-  let vertices = TwoG.bufferOfArray([|
+  let vertices = TwoG.vertexBufferOfArray([|
     0.0, 0.5, 0.5,
     0.5, -0.5, 0.5,
     -0.5, -0.5, 0.5,
   |]);
 
-  let colors = TwoG.bufferOfArray([|
+  let colors = TwoG.vertexBufferOfArray([|
     1.0, 0.0, 0.0, 1.0,
     0.0, 1.0, 0.0, 1.0,
     0.0, 0.0, 1.0, 1.0
   |]);
 
-  let program = TwoG.makeProgram(~vs, ~fs);
+  let program = TwoG.makeProgram(~vs, ~fs, ());
 
   (vertices, colors, program)
 };
