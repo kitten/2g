@@ -45,22 +45,23 @@ type shaderDescT = {
 };
 
 external getTarget: unit => glslTarget = "tg_target";
+
+/* The version pragma needs to be fixed manually for GLES3 */
+let pragmaVersionRe = Str.regexp("#version 300 es");
+let pragmaVersionTarget = switch (getTarget()) {
+| OpenGL => "#version 330"
+| OpenGLES2 => "#version 200 es"
+| OpenGLES3 => "#version 300 es"
+| Metal => ""
+};
+
+let fixPragmaVersion = Str.replace_first(pragmaVersionRe, pragmaVersionTarget);
+
+
 external _getOutput: shaderT => string = "tg_get_output";
 
-let getOutput = (shader: shaderT): string => {
-  let str = _getOutput(shader);
-
-  /* The version pragma needs to be fixed manually for GLES3 */
-  let pragmaVersionRe = Str.regexp("#version 300 es");
-  let pragmaVersionTarget = switch (getTarget()) {
-  | OpenGL => "#version 330"
-  | OpenGLES2 => "#version 200 es"
-  | OpenGLES3 => "#version 300 es"
-  | Metal => ""
-  };
-
-  Str.replace_first(pragmaVersionRe, pragmaVersionTarget, str);
-};
+let getOutput = (shader: shaderT): string =>
+  fixPragmaVersion(_getOutput(shader));
 
 external convertShader: (shaderType, string) => shaderT = "tg_convert_shader";
 external getInputLength: shaderT => int = "tg_get_input_length";
