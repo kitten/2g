@@ -48,7 +48,11 @@ let init = () => {
 let frame = (state) => {
   let (vertices, colors, program) = state;
 
-  TwoG.beginPass();
+  let red = mod_float(TwoG.now(), 2000.0) /. 1000.0;
+  let red = red >= 1.0 ? 1.0 -. (red -. 1.0): red;
+  let clearColor = (red, 0.4, 0.4, 1.0);
+
+  TwoG.beginPass(~clearColor, ());
   TwoG.applyPipeline(program);
   TwoG.applyBuffers([|vertices, colors|]);
 

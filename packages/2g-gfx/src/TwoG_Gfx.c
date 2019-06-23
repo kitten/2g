@@ -4,6 +4,7 @@
 
 #include <caml/custom.h>
 #include <caml/callback.h>
+#include <caml/alloc.h>
 #include <caml/memory.h>
 #include <caml/mlvalues.h>
 #include <caml/bigarray.h>
@@ -311,6 +312,8 @@ void _tg_init(void* data) {
     .d3d11_depth_stencil_view_cb = sapp_d3d11_get_depth_stencil_view,
   });
 
+  stm_setup();
+
   if (init_callback != NULL) {
     tg_state* state = (tg_state*) data;
     state->v = caml_callback(*init_callback, Val_unit);
@@ -424,4 +427,13 @@ void tg_apply_buffers(value index_buffer, value buffers) {
   }
 
   sg_apply_bindings(&bindings);
+}
+
+/*-- stateless calls --------------------------------------------------------*/
+
+CAMLprim value tg_now() {
+  CAMLparam0();
+  CAMLlocal1(now);
+  now = caml_copy_double(stm_ms(stm_now()));
+  CAMLreturn(now);
 }

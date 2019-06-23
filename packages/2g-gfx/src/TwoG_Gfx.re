@@ -191,3 +191,5 @@ let beginPass = (
 [@noalloc] external draw: (int, int, int) => unit = "tg_draw";
 [@noalloc] external endPass: unit => unit = "tg_end_pass";
 [@noalloc] external commit: unit => unit = "tg_commit";
+
+external now: unit => float = "tg_now";

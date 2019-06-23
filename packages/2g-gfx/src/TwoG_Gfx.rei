@@ -77,3 +77,4 @@ let beginPass: (~clearColor: colorT=?, unit) => unit;
 let draw: (int, int, int) => unit;
 let endPass: unit => unit;
 let commit: unit => unit;
+let now: unit => float;
