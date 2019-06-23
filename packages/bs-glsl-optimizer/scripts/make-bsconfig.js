@@ -41,18 +41,18 @@ if (process.platform === "darwin") {
 }
 
 const bsconfig = {
-  name: "2g-gfx",
+  name: "bs-glsl-optimizer",
   sources: {
     dir: "src",
-    files: ["TwoG_Gfx.re"]
+    files: ["glslOptimizer.re"]
   },
   "c-linker-flags": platformArgs,
   "allowed-build-kinds": ["bytecode", "native"],
-  "build-script": "build_script.re",
-  "bs-dependencies": ["bs-glsl-optimizer"],
+  "build-script": "scripts/build-glsl-optimizer.re",
   refmt: 3
 };
 
 const json = JSON.stringify(bsconfig, null, 2);
+const output = path.join(__dirname, "../bsconfig.json");
 
-fs.writeFileSync(path.join(__dirname, "bsconfig.json"), json);
+fs.writeFileSync(output, json);
