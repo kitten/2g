@@ -6,12 +6,12 @@ let vs = {|
   in vec3 position;
   in vec4 color;
 
-  uniform vec3 scale;
+  uniform mat4 mat;
 
   out vec4 out_color;
 
   void main() {
-    gl_Position = vec4(position.xyz * scale, 1.0);
+    gl_Position = mat * vec4(position.xyz, 1.0);
     out_color = color;
   }
 |};
@@ -57,7 +57,7 @@ let frame = (state) => {
   TwoG.applyBuffers([|vertices, colors|]);
 
   TwoG.applyVertexUniforms([|
-    Vec3(1.5, 1.0, 1.0)
+    Mat4(Mat4.scale(Vec3.make(2.0, 1.0, 1.0)))
   |]);
 
   TwoG.draw(0, 3, 1);

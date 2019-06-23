@@ -38,10 +38,10 @@ type uniformFormat =
 /* sg_uniform_type */
 type uniform =
   | Float(float)
-  | Vec2(float, float)
-  | Vec3(float, float, float)
-  | Vec4(float, float, float, float)
-  | Mat4(array(float));
+  | Vec2(Vec2.t)
+  | Vec3(Vec3.t)
+  | Vec4(Vec4.t)
+  | Mat4(Mat4.t);
 
 type colorT = (float, float, float, float);
 type textureT = (string, textureFormat);

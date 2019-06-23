@@ -1,0 +1,13 @@
+{
+  "name": "2g-math",
+  "sources": {
+    "dir": "src"
+  },
+  "allowed-build-kinds": [
+    "js",
+    "bytecode",
+    "native"
+  ],
+  "bs-dependencies": [],
+  "refmt": 3
+}

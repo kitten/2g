@@ -1,0 +1,13 @@
+{
+  "name": "2g-math",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "bsb -make-world -backend native",
+    "clean": "bsb -clean-world"
+  },
+  "devDependencies": {
+    "bsb-native": "^4.0.1100"
+  }
+}

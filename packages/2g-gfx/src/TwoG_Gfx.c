@@ -49,35 +49,17 @@ void tg_apply_uniforms(value stage, value ub_index, value uniforms) {
 
   for (int i = 0; i < uniforms_size; i++) {
     value uniform = Field(uniforms, i);
-    value mat;
-
-    switch (Tag_val(uniform)) {
-      case 0:
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 0));
-        break;
-      case 1:
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 0));
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 1));
-        break;
-      case 2:
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 0));
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 1));
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 2));
-        break;
-      case 3:
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 0));
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 1));
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 2));
-        uniform_data[data_index++] = (float) Double_val(Field(uniform, 3));
-        break;
-      case 4:
-        mat = Field(uniform, 0);
-        assert(Wosize_val(mat) / Double_wosize == 16);
-        for (int mat_i = 0; i < 16; i++) {
-          uniform_data[data_index++] = (float) Double_field(mat, mat_i);
-        }
-
-        break;
+    value inner = Field(uniform, 0);
+    int tag = Tag_val(uniform);
+    if (tag == 0) {
+      uniform_data[data_index++] = (float) Double_val(inner);
+    } else {
+      // NOTE: OCaml optimises the vector records to be stored as double arrays
+      assert(Tag_val(inner) == 254);
+      int inner_size = tag == 4 ? 16 : tag + 1;
+      for (int mat_i = 0; mat_i < inner_size; mat_i++) {
+        uniform_data[data_index++] = (float) Double_field(inner, mat_i);
+      }
     }
   }
 

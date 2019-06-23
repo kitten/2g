@@ -10,11 +10,15 @@
     {
       "backend": "native",
       "main-module": "Example"
-    }, {
+    },
+    {
       "backend": "bytecode",
       "main-module": "Example"
     }
   ],
-  "bs-dependencies": ["2g-gfx"],
+  "bs-dependencies": [
+    "2g-math",
+    "2g-gfx"
+  ],
   "refmt": 3
 }
