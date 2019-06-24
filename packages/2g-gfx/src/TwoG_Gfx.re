@@ -35,6 +35,66 @@ type uniformFormat =
   | UNI_FLOAT4
   | UNI_MAT4;
 
+type primitiveType =
+  | PRIMITIVE_POINTS
+  | PRIMITIVE_LINES
+  | PRIMITIVE_LINE_STRIP
+  | PRIMITIVE_TRIANGLES
+  | PRIMITIVE_TRINAGLES_STRIP;
+
+type cullMode =
+  | CULL_NONE
+  | CULL_FRONT
+  | CULL_BACK
+  | CULL_DEFAULT;
+
+type faceWinding =
+  | WINDING_CCW
+  | WINDING_CW;
+
+type depthComparison =
+  | COMPARE_NEVER
+  | COMPARE_LESS
+  | COMPARE_EQUAL
+  | COMPARE_LESS_EQUAL
+  | COMPARE_GREATER
+  | COMPARE_NOT_EQUAL
+  | COMPARE_GREATER_EQUAL
+  | COMPARE_ALWAYS
+  | COMPARE_DEFAULT;
+
+type stencilOperation =
+  | STENCIL_KEEP
+  | STENCIL_ZERO
+  | STENCIL_REPLACE
+  | STENCIL_INCR_CLAMP
+  | STENCIL_DECR_CLAMP
+  | STENCIL_INVERT
+  | STENCIL_INCR_WRAP
+  | STENCIL_DECR_WRAP;
+
+type blendFactor =
+  | BLEND_ZERO
+  | BLEND_ONE
+  | BLEND_SRC_COLOR
+  | BLEND_ONE_MINUS_SRC_COLOR
+  | BLEND_SRC_ALPHA
+  | BLEND_ONE_MINUS_SRC_ALPHA
+  | BLEND_DST_COLOR
+  | BLEND_ONE_MINUS_DST_COLOR
+  | BLEND_DST_ALPHA
+  | BLEND_ONE_MINUS_DST_ALPHA
+  | BLEND_SRC_ALPHA_SATURATED
+  | BLEND_COLOR
+  | ONE_MINUS_BLEND_COLOR
+  | BLEND_ALPHA
+  | ONE_MINUS_BLEND_ALPHA;
+
+type blendOperation =
+  | BLEND_OP_ADD
+  | BLEND_OP_SUBTRACT
+  | BLEND_OP_REVERSE_SUBTRACT;
+
 /* sg_uniform_type */
 type uniform =
   | Float(float)
@@ -43,7 +103,6 @@ type uniform =
   | Vec4(Vec4.t)
   | Mat4(Mat4.t);
 
-type colorT = (float, float, float, float);
 type textureT = (string, textureFormat);
 type uniformDescT = (string, uniformFormat);
 type attributeT = (int, vertexFormat);
@@ -56,6 +115,20 @@ type shaderDescT = {
   fsUniforms: array(uniformDescT)
 };
 
+/* pipeline desc */
+type pipelineSettingT =
+  | Index
+  | Primitive(primitiveType)
+  | DepthComparison(depthComparison)
+  | StencilFront(stencilOperation, stencilOperation, stencilOperation, depthComparison)
+  | StencilBack(stencilOperation, stencilOperation, stencilOperation, depthComparison)
+  | BlendColor(Vec4.t)
+  | BlendModeRgb(blendFactor, blendFactor, blendOperation)
+  | BlendModeAlpha(blendFactor, blendFactor, blendOperation)
+  | CullMode(cullMode)
+  | FaceWinding(faceWinding)
+  | DepthBias(float, float, float);
+
 type vertexBigarrayT = Bigarray.Array1.t(float, Bigarray.float32_elt, Bigarray.c_layout);
 type indexBigarrayT = Bigarray.Array1.t(int, Bigarray.int16_unsigned_elt, Bigarray.c_layout);
 
@@ -65,6 +138,8 @@ type indexBufferT;
 type shaderT;
 type pipelineT;
 type bindingsT;
+
+let colorBlack = Vec4.make(0.0, 0.0, 0.0, 1.0);
 
 let getInputName = (input: GlslOptimizer.shaderDescT) =>
   input.name;
@@ -122,13 +197,16 @@ external makeShader: (
 ) => shaderT = "tg_make_shader";
 
 external makePipeline: (
-  ~useIndex: bool=?,
   shaderT,
   array(attributeT),
-  unit
+  array(pipelineSettingT)
 ) => pipelineT = "tg_make_pipeline";
 
-let makeProgram = (~useIndex=?, ~vs, ~fs, ()) => {
+let makeProgram = (
+  ~vs,
+  ~fs,
+  settings
+) => {
   let vertex = GlslOptimizer.convertShader(Vertex, vs);
   let fragment = GlslOptimizer.convertShader(Fragment, fs);
 
@@ -156,7 +234,8 @@ let makeProgram = (~useIndex=?, ~vs, ~fs, ()) => {
   let vs = GlslOptimizer.getOutput(vertex);
   let fs = GlslOptimizer.getOutput(fragment);
   let shader = makeShader(~vs, ~fs, ~desc);
-  makePipeline(~useIndex=?useIndex, shader, formats, ());
+
+  makePipeline(shader, formats, settings);
 };
 
 external makeVertexBuffer: vertexBigarrayT => vertexBufferT = "tg_make_vertex_buffer";
@@ -180,10 +259,10 @@ external applyPipeline: pipelineT => unit = "tg_apply_pipeline";
 let applyVertexUniforms = (uniforms: array(uniform)) => _applyUniforms(Vertex, 0, uniforms);
 let applyFragmentUniforms = (uniforms: array(uniform)) => _applyUniforms(Fragment, 0, uniforms);
 
-[@noalloc] external _beginPass: (colorT, bool) => unit = "tg_begin_pass";
+[@noalloc] external _beginPass: (Vec4.t, bool) => unit = "tg_begin_pass";
 
 let beginPass = (
-  ~clearColor=(0.0, 0.0, 0.0, 1.0),
+  ~clearColor=colorBlack,
   ~shouldClear=true,
   ()
 ) => _beginPass(clearColor, shouldClear);
