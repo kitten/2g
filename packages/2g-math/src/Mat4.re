@@ -125,3 +125,40 @@ let multiply = (a: t, b: t) => [|
   a[2] *. b[12] +. a[6] *. b[13] +. a[10] *. b[14] +. a[14] *. b[15],
   a[3] *. b[12] +. a[7] *. b[13] +. a[11] *. b[14] +. a[15] *. b[15],
 |];
+
+let invert = (mat: t) => {
+  let b00 = mat[0] *. mat[5] -. mat[1] *. mat[4];
+  let b01 = mat[0] *. mat[6] -. mat[2] *. mat[4];
+  let b02 = mat[0] *. mat[7] -. mat[3] *. mat[4];
+  let b03 = mat[1] *. mat[6] -. mat[2] *. mat[5];
+  let b04 = mat[1] *. mat[7] -. mat[3] *. mat[5];
+  let b05 = mat[1] *. mat[7] -. mat[3] *. mat[6];
+  let b06 = mat[8] *. mat[13] -. mat[9] *. mat[12];
+  let b07 = mat[8] *. mat[14] -. mat[10] *. mat[12];
+  let b08 = mat[8] *. mat[15] -. mat[11] *. mat[12];
+  let b09 = mat[9] *. mat[14] -. mat[10] *. mat[13];
+  let b10 = mat[9] *. mat[15] -. mat[11] *. mat[13];
+  let b11 = mat[10] *. mat[15] -. mat[11] *. mat[14];
+
+  let det = b00 *. b11 -. b01 *. b10 +. b02 *. b09 +. b03 *. b08 -. b04 *. b07 +. b05 *. b06;
+  let det = 1.0 /. det;
+
+  [|
+    (mat[5] *. b11 -. mat[6] *. b10 +. mat[7] *. b09) *. det,
+    (mat[2] *. b10 -. mat[1] *. b11 -. mat[3] *. b09) *. det,
+    (mat[13] *. b05 -. mat[14] *. b04 +. mat[15] *. b03) *. det,
+    (mat[10] *. b04 -. mat[9] *. b05 -. mat[11] *. b03) *. det,
+    (mat[6] *. b08 -. mat[4] *. b11 -. mat[7] *. b07) *. det,
+    (mat[0] *. b11 -. mat[2] *. b08 +. mat[3] *. b07) *. det,
+    (mat[14] *. b02 -. mat[12] *. b05 -. mat[15] *. b01) *. det,
+    (mat[8] *. b05 -. mat[10] *. b02 +. mat[11] *. b01) *. det,
+    (mat[4] *. b10 -. mat[5] *. b08 +. mat[7] *. b06) *. det,
+    (mat[1] *. b08 -. mat[0] *. b10 -. mat[3] *. b06) *. det,
+    (mat[12] *. b04 -. mat[13] *. b02 +. mat[15] *. b00) *. det,
+    (mat[9] *. b02 -. mat[8] *. b04 -. mat[11] *. b00) *. det,
+    (mat[5] *. b07 -. mat[4] *. b09 -. mat[6] *. b06) *. det,
+    (mat[0] *. b09 -. mat[1] *. b07 +. mat[2] *. b06) *. det,
+    (mat[13] *. b01 -. mat[12] *. b03 -. mat[14] *. b00) *. det,
+    (mat[8] *. b03 -. mat[9] *. b01 +. mat[10] *. b00) *. det,
+  |]
+};
