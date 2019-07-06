@@ -1,7 +1,7 @@
 /**
  * \file imports.c
  * Standard C library function wrappers.
- * 
+ *
  * Imports are services which the device driver or window system or
  * operating system provides to the core renderer.  The core renderer (Mesa)
  * will call these functions in order to do memory allocation, simple I/O,
@@ -69,7 +69,7 @@ extern int vsnprintf(char *str, size_t count, const char *fmt, va_list arg);
  *
  * \param bytes number of bytes to allocate.
  * \param alignment alignment (must be greater than zero).
- * 
+ *
  * Allocates extra memory to accommodate rounding up the address for
  * alignment and to record the real malloc address.
  *
@@ -119,7 +119,7 @@ _mesa_align_calloc(size_t bytes, unsigned long alignment)
 {
 #if defined(HAVE_POSIX_MEMALIGN)
    void *mem;
-   
+
    mem = _mesa_align_malloc(bytes, alignment);
    if (mem != NULL) {
       (void) memset(mem, 0, bytes);
@@ -213,6 +213,7 @@ _mesa_align_realloc(void *oldBuffer, size_t oldSize, size_t newSize,
 /** \name Math */
 /*@{*/
 
+#if !defined(__EMSCRIPTEN__)
 
 #ifndef HAVE___BUILTIN_FFS
 /**
@@ -271,6 +272,7 @@ ffsll(long long int val)
 }
 #endif
 
+#endif // __EMSCRIPTEN__
 
 #ifndef HAVE___BUILTIN_POPCOUNT
 /**
@@ -350,7 +352,7 @@ _mesa_float_to_half(float val)
    const int flt_s = (fi.i >> 31) & 0x1;
    int s, e, m = 0;
    GLhalfARB result;
-   
+
    /* sign bit */
    s = flt_s;
 
@@ -545,10 +547,8 @@ _mesa_snprintf( char *str, size_t size, const char *fmt, ... )
 {
    int r;
    va_list args;
-   va_start( args, fmt );  
+   va_start( args, fmt );
    r = vsnprintf( str, size, fmt, args );
    va_end( args );
    return r;
 }
-
-

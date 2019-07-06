@@ -456,9 +456,10 @@ _mesa_align_realloc(void *oldBuffer, size_t oldSize, size_t newSize,
 extern void *
 _mesa_exec_malloc( GLuint size );
 
-extern void 
+extern void
 _mesa_exec_free( void *addr );
 
+#if !defined(__EMSCRIPTEN__)
 
 #ifndef FFS_DEFINED
 #define FFS_DEFINED 1
@@ -475,6 +476,7 @@ extern int ffsll(long long int i);
 #endif
 #endif /* FFS_DEFINED */
 
+#endif // __EMSCRIPTEN__
 
 #ifdef HAVE___BUILTIN_POPCOUNT
 #define _mesa_bitcount(i) __builtin_popcount(i)

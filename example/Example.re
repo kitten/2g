@@ -287,6 +287,8 @@ let init = () => {
     160.0, 160.0, 220.0,
   |]));
 
+  let start = TwoG.now();
+
   let program = TwoG.makeProgram(~vs, ~fs, [|
     DepthComparison(COMPARE_LESS),
     CullMode(CULL_BACK)
