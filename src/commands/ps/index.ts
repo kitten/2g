@@ -47,8 +47,10 @@ export function printPsHelp() {
     [
       'Usage: 2g ps [selector]',
       '',
+      'Lists recorded sessions, newest first; alive means still running.',
+      '',
       'Options:',
-      '  selector                Match by PID, command, or cwd',
+      '  selector                Substring of PID, CWD, or command',
       '  --active, -a            Show only active sessions',
       '  --json                  Print sessions as JSON',
       '',
