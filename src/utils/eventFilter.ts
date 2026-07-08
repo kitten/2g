@@ -145,9 +145,11 @@ function normalizeEventFilter(filter: string | string[] | undefined) {
 }
 
 function eventPatternToRegex(pattern: string) {
-  const source =
-    pattern.includes(':') || pattern.includes('*') ? pattern : `${pattern}:*`;
-  return source.split('*').map(escapeRegex).join('.*');
+  if (pattern.includes('*')) {
+    return pattern.split('*').map(escapeRegex).join('.*');
+  } else {
+    return `${escapeRegex(pattern)}(?::.*)?`;
+  }
 }
 
 function escapeRegex(value: string) {
