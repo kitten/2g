@@ -185,7 +185,7 @@ describe('tap', () => {
     });
   });
 
-  it('filters events by category, kind, comma lists, repeated values, and wildcards', () => {
+  it('filters events by segment prefix, comma lists, repeated values, and wildcards', () => {
     expect(
       parseEventLine(JSON.stringify({ _e: 'metro:done', _t: Date.now() }), {
         filter: 'metro',
@@ -196,6 +196,27 @@ describe('tap', () => {
         filter: 'metro:done',
       })
     ).toMatchObject({ _e: 'metro:done' });
+    expect(
+      parseEventLine(
+        JSON.stringify({ _e: 'metro:bundling:started', _t: Date.now() }),
+        {
+          filter: 'metro:bundling',
+        }
+      )
+    ).toMatchObject({ _e: 'metro:bundling:started' });
+    expect(
+      parseEventLine(
+        JSON.stringify({ _e: 'metro:bundling2', _t: Date.now() }),
+        {
+          filter: 'metro:bundling',
+        }
+      )
+    ).toBeNull();
+    expect(
+      parseEventLine(JSON.stringify({ _e: 'metro:done', _t: Date.now() }), {
+        filter: 'metro:do',
+      })
+    ).toBeNull();
     expect(
       parseEventLine(JSON.stringify({ _e: 'metro:done', _t: Date.now() }), {
         filter: 'metro:test*',
