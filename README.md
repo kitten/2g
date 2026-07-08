@@ -157,8 +157,11 @@ Use the CLI to find sessions, replay logs, or export traces:
 ```
 
 Selectors match a session by PID, command, session directory, or working directory.
-`tap` and `export` replay retained history first. `--tail` appends live events; an event
-written in the instant `--tail` attaches may appear twice at the seam.
+`--filter` patterns are event-name prefixes matched on whole segments — `metro:bundling`
+matches `metro:bundling` and `metro:bundling:started`, but not `metro:bundling2` — and a
+`*` matches anything, even across segments. `tap` and `export` replay retained history
+first. `--tail` appends live events; an event written in the instant `--tail` attaches
+may appear twice at the seam.
 
 Open Chrome traces in [ui.perfetto.dev](https://ui.perfetto.dev) or via Chrome DevTools →
 Performance → "Load profile" (renders as a plain flame chart); `chrome://tracing` is
@@ -284,16 +287,16 @@ nothing matches or the selector is ambiguous.
 
 Replays a session's retained history and optionally follows live events.
 
-| Option        | Default | Description                                                     |
-| ------------- | ------- | --------------------------------------------------------------- |
-| `since`       | —       | Replay from a duration (`'5m'`), Unix time, ISO date, or `Date` |
-| `follow`      | `false` | Follow live events after replaying history                      |
-| `filter`      | —       | `category[:kind]` patterns; `*` wildcards, comma-separated      |
-| `spans`       | `false` | Only yield events carrying a span duration                      |
-| `debug`       | `false` | Include debug-level events                                      |
-| `signal`      | —       | `AbortSignal` that stops following                              |
-| `timeout`     | —       | Stop following after an absolute duration in milliseconds       |
-| `idleTimeout` | —       | Stop following after this many milliseconds without a new event |
+| Option        | Default | Description                                                          |
+| ------------- | ------- | -------------------------------------------------------------------- |
+| `since`       | —       | Replay from a duration (`'5m'`), Unix time, ISO date, or `Date`      |
+| `follow`      | `false` | Follow live events after replaying history                           |
+| `filter`      | —       | Event-name prefixes (whole segments); `*` wildcards, comma-separated |
+| `spans`       | `false` | Only yield events carrying a span duration                           |
+| `debug`       | `false` | Include debug-level events                                           |
+| `signal`      | —       | `AbortSignal` that stops following                                   |
+| `timeout`     | —       | Stop following after an absolute duration in milliseconds            |
+| `idleTimeout` | —       | Stop following after this many milliseconds without a new event      |
 
 #### `captureEvents(options?: CaptureOptions) => EventCapture`
 
