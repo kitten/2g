@@ -191,6 +191,9 @@ function printTypegenHelp() {
     [
       'Usage: 2g typegen',
       '',
+      'Merges EventRegistry declarations into one schema, listing every event',
+      'name and payload a project can emit.',
+      '',
       'Options:',
       '  -p, --project <file>     tsconfig.json path',
       '  -o, --output <file>      Write output to a file',

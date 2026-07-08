@@ -36,6 +36,8 @@ export function printCleanHelp() {
     [
       'Usage: 2g clean',
       '',
+      'Removes stale exited sessions past the retention window.',
+      '',
       'Options:',
       '  --all, -a              Remove all exited sessions',
       '  --json',
