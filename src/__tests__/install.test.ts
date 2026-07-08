@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -180,7 +181,10 @@ describe('install session', () => {
     const session = createSession({ command: 'fresh' });
 
     try {
-      expect(await exists(staleDir)).toBe(true);
+      // Synchronous check: the deferred cleanup runs on a setImmediate, so it
+      // cannot have fired before this same event-loop turn yields. Awaiting an
+      // async exists() here would race the cleanup's synchronous rmSync.
+      expect(existsSync(staleDir)).toBe(true);
       await waitFor(async () => !(await exists(staleDir)));
     } finally {
       session.destroy();
