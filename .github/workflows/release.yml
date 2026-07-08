@@ -57,5 +57,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git reset --hard origin/main
-          pnpm changeset version --no-git-tag --snapshot canary
-          pnpm changeset publish --no-git-tag --snapshot canary --tag canary
+          pnpm changeset version --snapshot canary
+          pnpm changeset publish --no-git-tag --tag canary
