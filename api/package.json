@@ -1,0 +1,17 @@
+{
+  "name": "2g-api",
+  "private": true,
+  "version": "0.0.0",
+  "main": "../dist/2g-api.js",
+  "module": "../dist/2g-api.mjs",
+  "types": "../dist/2g-api.d.ts",
+  "source": "../src/api.ts",
+  "exports": {
+    ".": {
+      "types": "../dist/2g-api.d.ts",
+      "import": "../dist/2g-api.mjs",
+      "require": "../dist/2g-api.js",
+      "source": "../src/api.ts"
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "name": "2g",
+  "version": "0.1.0",
+  "description": "Low-overhead structured event logs for agents and developers",
+  "author": "Phil Pluckthun <phil@kitten.sh>",
+  "source": "./src/index.ts",
+  "main": "./dist/2g.js",
+  "module": "./dist/2g.mjs",
+  "types": "./dist/2g.d.ts",
+  "bin": {
+    "2g": "./bin/cli.js"
+  },
+  "files": [
+    "LICENSE.md",
+    "README.md",
+    "CHANGELOG.md",
+    "api/",
+    "bin/",
+    "cli/",
+    "dist/"
+  ],
+  "scripts": {
+    "test": "vitest test",
+    "test:run": "vitest test --run",
+    "prebench": "pnpm run build",
+    "bench": "vitest bench",
+    "build": "rollup -c ./scripts/rollup.config.mjs",
+    "postbuild": "tsc --lib esnext,dom,dom.iterable --target esnext --module nodenext --moduleResolution nodenext --noEmit ./dist/2g.d.ts ./dist/2g-api.d.ts ./dist/2g-cli.d.ts",
+    "check": "tsc --noEmit",
+    "clean": "rimraf dist node_modules/.cache",
+    "prepublishOnly": "run-s clean build check test:run",
+    "prepare": "node ./scripts/prepare.js || true",
+    "changeset:version": "changeset version && pnpm install --lockfile-only",
+    "changeset:publish": "changeset publish"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/2g.d.ts",
+      "import": "./dist/2g.mjs",
+      "require": "./dist/2g.js",
+      "source": "./src/index.ts"
+    },
+    "./api": {
+      "types": "./dist/2g-api.d.ts",
+      "import": "./dist/2g-api.mjs",
+      "require": "./dist/2g-api.js",
+      "source": "./src/api.ts"
+    },
+    "./cli": {
+      "types": "./dist/2g-cli.d.ts",
+      "import": "./dist/2g-cli.mjs",
+      "require": "./dist/2g-cli.js",
+      "source": "./src/cli.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "arrowParens": "avoid",
+    "trailingComma": "es5"
+  },
+  "lint-staged": {
+    "*.{js,ts,json,md}": "prettier --write"
+  },
+  "keywords": [],
+  "license": "MIT",
+  "repository": "https://github.com/kitten/2g",
+  "bugs": {
+    "url": "https://github.com/kitten/2g/issues"
+  },
+  "devDependencies": {
+    "@babel/plugin-transform-typescript": "^7.28.5",
+    "@changesets/cli": "^2.29.7",
+    "@changesets/get-github-info": "^0.6.0",
+    "@rollup/plugin-babel": "^6.1.0",
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@types/node": "^25.9.2",
+    "dotenv": "^17.2.3",
+    "lint-staged": "^16.2.6",
+    "modern-tar": "^0.7.2",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.6.2",
+    "rimraf": "^6.1.0",
+    "rollup": "^4.53.3",
+    "rollup-plugin-cjs-check": "^1.0.3",
+    "rollup-plugin-dts": "^6.2.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.10"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.8.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

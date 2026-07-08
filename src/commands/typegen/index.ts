@@ -1,0 +1,202 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { parseArgs } from 'node:util';
+
+import ts from 'typescript';
+import { redirectConsoleToStderr } from '../../utils/redirectConsole';
+import { parseHelp } from '../shared';
+
+export interface TypegenOptions {
+  format?: 'dts' | 'json';
+  output?: string;
+  project?: string;
+}
+
+interface TypegenEvent {
+  key: string;
+  category: string;
+  name: string;
+  fields: Record<string, string>;
+  optionalFields: string[];
+}
+
+export function generateEventRegistryTypes(options: TypegenOptions = {}) {
+  const project = options.project ?? findTsconfig(process.cwd());
+  if (!project) throw new Error('Could not find tsconfig.json');
+
+  const config = ts.readConfigFile(project, ts.sys.readFile);
+  if (config.error) throw new Error(formatDiagnostic(config.error));
+
+  const parsed = ts.parseJsonConfigFileContent(
+    config.config,
+    ts.sys,
+    path.dirname(project)
+  );
+  const program = ts.createProgram(parsed.fileNames, parsed.options);
+  const checker = program.getTypeChecker();
+  const registry = findEventRegistry(program, checker);
+  if (!registry) throw new Error('Could not resolve EventRegistry');
+
+  const events = registry
+    .getProperties()
+    .map(symbol => serializeRegistryEntry(symbol, checker))
+    .sort((a, b) => a.key.localeCompare(b.key));
+
+  return options.format === 'json'
+    ? JSON.stringify(events, null, 2)
+    : formatDts(events);
+}
+
+export function runTypegenCli(args: string[]) {
+  if (parseHelp(args)) {
+    printTypegenHelp();
+    return;
+  }
+  const parsed = parseArgs({
+    args,
+    options: {
+      format: { type: 'string' },
+      json: { type: 'boolean' },
+      output: { type: 'string', short: 'o' },
+      project: { type: 'string', short: 'p' },
+      help: { type: 'boolean', short: 'h' },
+    },
+  });
+  if (parsed.values.json && parsed.values.format === 'dts')
+    throw new Error('Use either --json or --format dts, not both');
+  if (parsed.values.json) redirectConsoleToStderr();
+  const format = parsed.values.json ? 'json' : (parsed.values.format ?? 'dts');
+  if (format !== 'dts' && format !== 'json')
+    throw new Error(`Unsupported format: ${format}`);
+
+  const options: TypegenOptions = {
+    format,
+    output: parsed.values.output,
+    project: parsed.values.project,
+  };
+
+  const output = generateEventRegistryTypes(options);
+  if (options.output) fs.writeFileSync(options.output, `${output}\n`);
+  else process.stdout.write(`${output}\n`);
+}
+
+function findEventRegistry(program: ts.Program, checker: ts.TypeChecker) {
+  const ambient = checker
+    .getAmbientModules()
+    .find(symbol => symbol.getName() === '"2g"');
+  const ambientRegistry = ambient?.exports?.get('EventRegistry' as ts.__String);
+  if (ambientRegistry) return checker.getDeclaredTypeOfSymbol(ambientRegistry);
+
+  for (const sourceFile of program.getSourceFiles()) {
+    if (isEventLogEntrypoint(sourceFile.fileName)) {
+      const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
+      const registry = moduleSymbol?.exports?.get(
+        'EventRegistry' as ts.__String
+      );
+      if (registry) return checker.getDeclaredTypeOfSymbol(registry);
+    }
+  }
+
+  for (const sourceFile of program.getSourceFiles()) {
+    if (!/[\\/]2g[\\/]/.test(sourceFile.fileName)) continue;
+    let found: ts.InterfaceDeclaration | undefined;
+    sourceFile.forEachChild(function visit(node) {
+      if (ts.isInterfaceDeclaration(node) && node.name.text === 'EventRegistry')
+        found = node;
+      node.forEachChild(visit);
+    });
+    if (found) {
+      const symbol = checker.getSymbolAtLocation(found.name);
+      if (symbol) return checker.getDeclaredTypeOfSymbol(symbol);
+    }
+  }
+  return null;
+}
+
+function isEventLogEntrypoint(fileName: string) {
+  return /(?:^|[\\/])(?:src[\\/]index\.ts|dist[\\/]2g\.d\.ts)$/.test(fileName);
+}
+
+function serializeRegistryEntry(
+  symbol: ts.Symbol,
+  checker: ts.TypeChecker
+): TypegenEvent {
+  const key = symbol.getName().replace(/^"|"$/g, '');
+  const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+  const type = declaration
+    ? checker.getTypeOfSymbolAtLocation(symbol, declaration)
+    : undefined;
+  const fields: Record<string, string> = {};
+  const optionalFields: string[] = [];
+
+  for (const field of type?.getProperties() ?? []) {
+    const fieldDeclaration = field.valueDeclaration ?? field.declarations?.[0];
+    if (!fieldDeclaration) continue;
+    if ((field.flags & ts.SymbolFlags.Optional) !== 0)
+      optionalFields.push(field.getName());
+    fields[field.getName()] = checker.typeToString(
+      checker.getTypeOfSymbolAtLocation(field, fieldDeclaration)
+    );
+  }
+
+  const index = key.indexOf(':');
+  return {
+    key,
+    category: index > -1 ? key.slice(0, index) : '',
+    name: index > -1 ? key.slice(index + 1) : key,
+    fields,
+    optionalFields,
+  };
+}
+
+function formatDts(events: TypegenEvent[]) {
+  const lines = [
+    '// Auto-generated by 2g typegen',
+    '// Do not edit manually.',
+    '',
+    "declare module '2g' {",
+    '  interface EventRegistry {',
+  ];
+
+  for (const event of events) {
+    lines.push(`    '${event.key}': {`);
+    for (const [name, type] of Object.entries(event.fields)) {
+      const optional = event.optionalFields.includes(name) ? '?' : '';
+      lines.push(`      ${name}${optional}: ${type};`);
+    }
+    lines.push('    };');
+  }
+
+  lines.push('  }', '}');
+  return lines.join('\n');
+}
+
+function findTsconfig(start: string) {
+  let dir = start;
+  while (true) {
+    const file = path.join(dir, 'tsconfig.json');
+    if (fs.existsSync(file)) return file;
+    const next = path.dirname(dir);
+    if (next === dir) return null;
+    dir = next;
+  }
+}
+
+function formatDiagnostic(diagnostic: ts.Diagnostic) {
+  return ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+}
+
+function printTypegenHelp() {
+  process.stdout.write(
+    [
+      'Usage: 2g typegen',
+      '',
+      'Options:',
+      '  -p, --project <file>     tsconfig.json path',
+      '  -o, --output <file>      Write output to a file',
+      '  --format <format>        dts or json',
+      '  --json                   Print JSON schema',
+      '',
+    ].join('\n')
+  );
+}

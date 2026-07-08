@@ -1,0 +1,17 @@
+{
+  "name": "2g-cli",
+  "private": true,
+  "version": "0.0.0",
+  "main": "../dist/2g-cli.js",
+  "module": "../dist/2g-cli.mjs",
+  "types": "../dist/2g-cli.d.ts",
+  "source": "../src/cli.ts",
+  "exports": {
+    ".": {
+      "types": "../dist/2g-cli.d.ts",
+      "import": "../dist/2g-cli.mjs",
+      "require": "../dist/2g-cli.js",
+      "source": "../src/cli.ts"
+    }
+  }
+}
