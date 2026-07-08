@@ -50,7 +50,7 @@ export function printPsHelp() {
       'Lists recorded sessions, newest first; alive means still running.',
       '',
       'Options:',
-      '  selector                Substring of PID, command, or cwd',
+      '  selector                Substring of PID, CWD, or command',
       '  --active, -a            Show only active sessions',
       '  --json                  Print sessions as JSON',
       '',
