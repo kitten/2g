@@ -6,6 +6,7 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  DEBUG_SEGMENTS,
   DEFAULT_RETAIN_MS,
   EVENT_LOG_FORMAT_VERSION,
   EVENT_LOG_TMP_DIR,
@@ -16,7 +17,7 @@ import {
 } from '../constants';
 import { _setSessionBaseDir, getSessionBaseDir } from '../clean';
 import { createSession } from '../session';
-import { _resetEventLogState } from '../state';
+import { _resetEventLogState, eventLogState } from '../state';
 
 describe('install session', () => {
   it('creates session metadata before sockets are ready and forwards worker lines', async () => {
@@ -440,6 +441,28 @@ describe('install auto-connect', () => {
       restoreDir();
       await fs.rm(dir, { recursive: true, force: true });
       await fs.rm(fileDir, { recursive: true, force: true });
+    }
+  });
+
+  it('retains a larger segment ring buffer in debug mode', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
+    const restoreDir = setSessionDir(dir);
+    eventLogState.debug = true;
+    const session = createSession({ command: 'debug segments' });
+
+    try {
+      const meta = JSON.parse(
+        await fs.readFile(
+          path.join(session.sessionDir, SESSION_FILES.meta),
+          'utf8'
+        )
+      );
+      expect(meta.maxSegments).toBe(DEBUG_SEGMENTS);
+    } finally {
+      session.destroy();
+      _resetEventLogState();
+      restoreDir();
+      await fs.rm(dir, { recursive: true, force: true });
     }
   });
 

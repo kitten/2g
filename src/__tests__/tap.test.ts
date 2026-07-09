@@ -12,7 +12,7 @@ import {
 } from '../constants';
 import { _setSessionBaseDir } from '../clean';
 import { createSession } from '../session';
-import { listSessions, resolveSession, tap } from '../tap';
+import { detectRotationLoss, listSessions, resolveSession, tap } from '../tap';
 import { parseEventLine, parseSince } from '../utils/eventFilter';
 import type { ParsedEvent } from '../types';
 
@@ -163,6 +163,35 @@ describe('tap', () => {
         'test:1',
         'test:0',
       ]);
+    } finally {
+      session.destroy();
+      restoreDir();
+      restoreIpc();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('detects rotation loss from the oldest retained segment', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-tap-'));
+    const restoreDir = setSessionDir(dir);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const session = createSession({ command: 'rotation', maxSegments: 3 });
+    const write = (index: number, event: Record<string, unknown>) =>
+      fs.writeFile(
+        path.join(session.sessionDir, `${index}.jsonl`),
+        `${JSON.stringify(event)}\n`
+      );
+
+    try {
+      // Oldest segment still begins at the session start: nothing was dropped
+      await write(2, { _e: 'root:init', _t: Date.now() });
+      await write(1, { _e: 'metro:bundling', _t: Date.now() });
+      await write(0, { _e: 'metro:done', _t: Date.now() });
+      expect(await detectRotationLoss(session.sessionDir)).toBe(false);
+
+      // Rotation has since discarded the start: oldest segment no longer has it
+      await write(2, { _e: 'metro:bundling', _t: Date.now() });
+      expect(await detectRotationLoss(session.sessionDir)).toBe(true);
     } finally {
       session.destroy();
       restoreDir();

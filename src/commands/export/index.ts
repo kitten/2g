@@ -13,6 +13,7 @@ import {
   readJsonlFile,
   readJsonlStdin,
   tapArgOptions,
+  warnOnRotationLoss,
 } from '../shared';
 import { convertToChromeTrace } from './chromeTrace';
 import { convertToOpenTelemetry } from './opentelemetry';
@@ -35,6 +36,7 @@ export async function runExportCli(args: string[]) {
     const session = await resolveSession(options.selector);
     processName = formatSessionProcessName(session);
     exportPid = session.pid;
+    await warnOnRotationLoss(session.sessionDir, '2g export --tail');
     events = tap(session.sessionDir, {
       follow: options.follow,
       debug: options.debug,
@@ -113,6 +115,12 @@ function printExportHelp() {
       'Usage: 2g export [selector]',
       '',
       'Exports session events to Chrome Trace or OTLP JSON.',
+      '(Without --tail it reads only the retained window. Rotated out logs may be lost)',
+      '',
+      '--tail attaches to an already-running session and follows live from that point.',
+      '  Run it after the session is up and leave it attached while the workload runs.',
+      '  It will automatically stop on 30s idle.',
+      'To trace a full command instead, use `2g record`.',
       '',
       'Options:',
       '  selector                 Substring of PID, CWD, or command; a running',
@@ -129,9 +137,9 @@ function printExportHelp() {
       '                           plain "ms" payload field is not a span',
       '  --debug                  Include debug events (only recorded when the',
       '                           command ran with LOG_DEBUG set)',
-      '  --tail                   Follow live events after replaying history',
-      '  --timeout <duration>     Stop tailing after an absolute duration',
-      '                           Tail also stops after 30s without new events',
+      '  --tail                   Follow live events after replaying history; stops',
+      '                           automatically on 30s idle',
+      '  --timeout <duration>     Also stop tailing after this absolute duration',
       '',
     ].join('\n')
   );

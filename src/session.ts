@@ -3,6 +3,8 @@ import path from 'node:path';
 import net from 'node:net';
 
 import {
+  DEBUG_SEGMENTS,
+  DEBUG_SEGMENT_SIZE,
   DEFAULT_SEGMENTS,
   DEFAULT_SEGMENT_SIZE,
   EVENT_LOG_FORMAT_VERSION,
@@ -10,6 +12,7 @@ import {
 } from './constants';
 import { cleanStaleSessionsSync, getSessionBaseDir } from './clean';
 import { createDebugSink } from './debug';
+import { eventLogState } from './state';
 import { BroadcastChannel } from './utils/broadcastChannel';
 import { LogStream, type EventSink } from './utils/logStream';
 import { publishIpcPath } from './utils/ipc';
@@ -75,8 +78,12 @@ export function createSession(options: SessionOptions): SessionContext {
     fs.chmodSync(baseDir, 0o700);
   } catch {}
 
-  const maxSegments = options.maxSegments ?? DEFAULT_SEGMENTS;
-  const maxSegmentSize = options.maxSegmentSize ?? DEFAULT_SEGMENT_SIZE;
+  const maxSegments =
+    options.maxSegments ??
+    (eventLogState.debug ? DEBUG_SEGMENTS : DEFAULT_SEGMENTS);
+  const maxSegmentSize =
+    options.maxSegmentSize ??
+    (eventLogState.debug ? DEBUG_SEGMENT_SIZE : DEFAULT_SEGMENT_SIZE);
   const liveSocket = createSocketAddress(sessionDir, sessionId, 'live');
   const ipcSocket = createSocketAddress(sessionDir, sessionId, 'ipc');
 
