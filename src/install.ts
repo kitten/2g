@@ -32,6 +32,9 @@ export function installEventLogger(
 ): void {
   if (eventLogState.primarySink) return;
 
+  const workerId = getProcessWorkerId();
+  if (workerId) eventLogState.eventMeta = { _w: workerId };
+
   const options =
     targetOrOptions && typeof targetOrOptions === 'object'
       ? targetOrOptions
@@ -150,9 +153,6 @@ function activateSink(sink: EventSink, version?: string) {
 }
 
 function connectToParent(ipcPath: string) {
-  const workerId = getProcessWorkerId();
-  if (workerId) eventLogState.eventMeta = { _w: workerId };
-
   eventLogState.primarySink = createPrimarySink(openIpc(ipcPath), {
     closeFd: false,
   });

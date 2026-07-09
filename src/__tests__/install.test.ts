@@ -11,10 +11,12 @@ import {
   EVENT_LOG_TMP_DIR,
   INTERNAL_IPC_ENV,
   LOG_DEBUG_ENV,
+  LOG_EVENTS_ENV,
   SESSION_FILES,
 } from '../constants';
 import { _setSessionBaseDir, getSessionBaseDir } from '../clean';
 import { createSession } from '../session';
+import { _resetEventLogState } from '../state';
 
 describe('install session', () => {
   it('creates session metadata before sockets are ready and forwards worker lines', async () => {
@@ -268,6 +270,72 @@ describe('install session', () => {
       session.destroy();
       restoreDebug();
       restoreDir();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('install explicit file target', () => {
+  it('tags worker events with a worker id when logging to a file', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-file-'));
+    const file = path.join(dir, 'events.jsonl');
+    const restoreEvents = setEnv(LOG_EVENTS_ENV, file);
+    vi.doMock('../utils/processOrigin', async importOriginal => ({
+      ...(await importOriginal<typeof import('../utils/processOrigin')>()),
+      getProcessWorkerId: () => 'worker_thread:7',
+    }));
+
+    try {
+      vi.resetModules();
+      const { installEventLogger, events, flushEventLogger } =
+        await import('../index');
+      installEventLogger();
+      events('custom')('ping', {});
+      await flushEventLogger();
+
+      const lines = (await fs.readFile(file, 'utf8'))
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      const ping = lines.find(line => line._e === 'custom:ping');
+      expect(ping._w).toBe('worker_thread:7');
+    } finally {
+      restoreEvents();
+      vi.doUnmock('../utils/processOrigin');
+      vi.resetModules();
+      _resetEventLogState();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('omits the worker id for the main process', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-file-'));
+    const file = path.join(dir, 'events.jsonl');
+    const restoreEvents = setEnv(LOG_EVENTS_ENV, file);
+    vi.doMock('../utils/processOrigin', async importOriginal => ({
+      ...(await importOriginal<typeof import('../utils/processOrigin')>()),
+      getProcessWorkerId: () => undefined,
+    }));
+
+    try {
+      vi.resetModules();
+      const { installEventLogger, events, flushEventLogger } =
+        await import('../index');
+      installEventLogger();
+      events('custom')('ping', {});
+      await flushEventLogger();
+
+      const lines = (await fs.readFile(file, 'utf8'))
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      const ping = lines.find(line => line._e === 'custom:ping');
+      expect(ping._w).toBeUndefined();
+    } finally {
+      restoreEvents();
+      vi.doUnmock('../utils/processOrigin');
+      vi.resetModules();
+      _resetEventLogState();
       await fs.rm(dir, { recursive: true, force: true });
     }
   });
