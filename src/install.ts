@@ -27,18 +27,39 @@ export interface InstallEventLoggerOptions extends SessionOptions {
 
 const rootEvent = events('root');
 
+export function installChildEventLogger(
+  options?: InstallEventLoggerOptions
+): boolean {
+  if (eventLogState.primarySink) {
+    return true;
+  }
+
+  const workerId = getProcessWorkerId();
+  if (workerId) {
+    eventLogState.eventMeta = { _w: workerId };
+  }
+
+  const ipcPath = getParentIpcPath();
+  if (ipcPath) {
+    eventLogState.debug = options?.debug ?? !!process.env[LOG_DEBUG_ENV];
+    connectToParent(ipcPath);
+    return true;
+  } else {
+    return false;
+  }
+}
+
 export function installEventLogger(
   targetOrOptions?: string | number | InstallEventLoggerOptions
 ): void {
-  if (eventLogState.primarySink) return;
-
-  const workerId = getProcessWorkerId();
-  if (workerId) eventLogState.eventMeta = { _w: workerId };
-
   const options =
     targetOrOptions && typeof targetOrOptions === 'object'
       ? targetOrOptions
       : undefined;
+
+  if (installChildEventLogger(options)) {
+    return;
+  }
 
   const explicitTarget =
     parseLogTarget(process.env[LOG_EVENTS_ENV]) ??
@@ -54,13 +75,6 @@ export function installEventLogger(
     eventLogState.debug = options?.debug ?? true;
     eventLogState.eventLoggerInfo = getExplicitTargetInfo(explicitTarget);
     activateSink(createPrimarySink(explicitTarget));
-    return;
-  }
-
-  const ipcPath = getParentIpcPath();
-  if (ipcPath) {
-    eventLogState.debug = options?.debug ?? !!process.env[LOG_DEBUG_ENV];
-    connectToParent(ipcPath);
     return;
   }
 

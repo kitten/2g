@@ -280,6 +280,7 @@ describe('install explicit file target', () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-file-'));
     const file = path.join(dir, 'events.jsonl');
     const restoreEvents = setEnv(LOG_EVENTS_ENV, file);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
     vi.doMock('../utils/processOrigin', async importOriginal => ({
       ...(await importOriginal<typeof import('../utils/processOrigin')>()),
       getProcessWorkerId: () => 'worker_thread:7',
@@ -301,6 +302,7 @@ describe('install explicit file target', () => {
       expect(ping._w).toBe('worker_thread:7');
     } finally {
       restoreEvents();
+      restoreIpc();
       vi.doUnmock('../utils/processOrigin');
       vi.resetModules();
       _resetEventLogState();
@@ -312,6 +314,7 @@ describe('install explicit file target', () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-file-'));
     const file = path.join(dir, 'events.jsonl');
     const restoreEvents = setEnv(LOG_EVENTS_ENV, file);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
     vi.doMock('../utils/processOrigin', async importOriginal => ({
       ...(await importOriginal<typeof import('../utils/processOrigin')>()),
       getProcessWorkerId: () => undefined,
@@ -333,9 +336,140 @@ describe('install explicit file target', () => {
       expect(ping._w).toBeUndefined();
     } finally {
       restoreEvents();
+      restoreIpc();
       vi.doUnmock('../utils/processOrigin');
       vi.resetModules();
       _resetEventLogState();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('is idempotent: a second install keeps the first target', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-file-'));
+    const fileA = path.join(dir, 'a.jsonl');
+    const fileB = path.join(dir, 'b.jsonl');
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const restoreEvents = setEnv(LOG_EVENTS_ENV, undefined);
+
+    try {
+      vi.resetModules();
+      const { installEventLogger, getEventLoggerInfo } =
+        await import('../install');
+      installEventLogger(fileA);
+      // A second install must not re-open a different target.
+      installEventLogger(fileB);
+      expect(getEventLoggerInfo()).toMatchObject({
+        destination: 'file',
+        file: fileA,
+      });
+      expect(await exists(fileB)).toBe(false);
+    } finally {
+      restoreEvents();
+      restoreIpc();
+      vi.resetModules();
+      _resetEventLogState();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('install auto-connect', () => {
+  it('auto-connects to a parent session on import and pipes events to it', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-child-'));
+    const restoreDir = setSessionDir(dir);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    // createSession publishes __eventLogIpc, mimicking a spawned child's env.
+    const session = createSession({ command: 'parent' });
+
+    try {
+      vi.resetModules();
+      // Importing the library auto-connects because __eventLogIpc is present.
+      const {
+        installChildEventLogger,
+        getEventLoggerInfo,
+        events,
+        flushEventLogger,
+      } = await import('../index');
+      expect(getEventLoggerInfo()?.destination).toBe('ipc');
+
+      // A repeat call is a no-op: it reports the active logger without reconnecting.
+      expect(installChildEventLogger()).toBe(true);
+      expect(getEventLoggerInfo()?.destination).toBe('ipc');
+
+      events('custom')('ping', {});
+      await flushEventLogger();
+      await waitFor(async () =>
+        (
+          await fs.readFile(path.join(session.sessionDir, '0.jsonl'), 'utf8')
+        ).includes('custom:ping')
+      );
+    } finally {
+      session.destroy();
+      vi.resetModules();
+      _resetEventLogState();
+      restoreIpc();
+      restoreDir();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('prefers a parent session over an inherited explicit file target', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-child-'));
+    const fileDir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-file-'));
+    const file = path.join(fileDir, 'events.jsonl');
+    const restoreDir = setSessionDir(dir);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const session = createSession({ command: 'parent' });
+    const restoreEvents = setEnv(LOG_EVENTS_ENV, file);
+
+    try {
+      vi.resetModules();
+      // Import from '../install' (not '../index') to exercise installEventLogger's
+      // own precedence rather than the on-import auto-connect side effect.
+      const { installEventLogger, getEventLoggerInfo } =
+        await import('../install');
+      installEventLogger();
+      expect(getEventLoggerInfo()?.destination).toBe('ipc');
+      expect(await exists(file)).toBe(false);
+    } finally {
+      session.destroy();
+      vi.resetModules();
+      _resetEventLogState();
+      restoreEvents();
+      restoreIpc();
+      restoreDir();
+      await fs.rm(dir, { recursive: true, force: true });
+      await fs.rm(fileDir, { recursive: true, force: true });
+    }
+  });
+
+  it('does nothing without a parent, and a later installEventLogger still works', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-file-'));
+    const file = path.join(dir, 'events.jsonl');
+    const restoreDir = setSessionDir(dir);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const restoreEvents = setEnv(LOG_EVENTS_ENV, undefined);
+
+    try {
+      vi.resetModules();
+      const {
+        installChildEventLogger,
+        installEventLogger,
+        getEventLoggerInfo,
+      } = await import('../index');
+      // The on-import auto-connect was a no-op with no parent.
+      expect(installChildEventLogger()).toBe(false);
+      expect(getEventLoggerInfo()).toBeNull();
+
+      // A subsequent explicit install still proceeds normally.
+      installEventLogger(file);
+      expect(getEventLoggerInfo()?.destination).toBe('file');
+    } finally {
+      vi.resetModules();
+      _resetEventLogState();
+      restoreEvents();
+      restoreIpc();
+      restoreDir();
       await fs.rm(dir, { recursive: true, force: true });
     }
   });
