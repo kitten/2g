@@ -56,8 +56,8 @@ const log = events('metro');
 
 log('ready', { port: 8081 });
 
-const end = log.span('bundle', { platform: 'ios' });
-end('bundle', { cached: false });
+const end = log.span();
+end('bundle', { platform: 'ios', cached: false });
 ```
 
 Tap into the session from another terminal:
@@ -211,8 +211,8 @@ Returns a typed logger for `category`. The logger is callable directly and carri
 helpers:
 
 - `log(event, data?)`: writes a `category:event` line with the payload
-- `log.span(event, data?)`: starts a span; returns an `end(event, data?)` function that
-  writes a single event carrying the duration as `_d`
+- `log.span()`: starts a span; returns an `end(event, data?)` function that writes a single
+  event carrying the duration as `_d` (name the event `:done`/`:failed` at the end)
 - `log.path(target)`: returns a `Serialized<string>` of the path relative to the log
   target
 - `log.error(error)`: returns a `Serialized<SerializedError>` of
