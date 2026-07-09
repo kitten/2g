@@ -116,6 +116,10 @@ function printExportHelp() {
       '',
       'Exports session events to Chrome Trace or OTLP JSON.',
       '',
+      'Prefer --tail to capture a run end-to-end: start it before the workload and it',
+      'replays history, follows live, and self-terminates on 30s idle. Without --tail',
+      'it exports only the retained window, which may be partial under load.',
+      '',
       'Options:',
       '  selector                 Substring of PID, CWD, or command; a running',
       '                           session wins ties',
@@ -131,9 +135,9 @@ function printExportHelp() {
       '                           plain "ms" payload field is not a span',
       '  --debug                  Include debug events (only recorded when the',
       '                           command ran with LOG_DEBUG set)',
-      '  --tail                   Follow live events after replaying history',
-      '  --timeout <duration>     Stop tailing after an absolute duration',
-      '                           Tail also stops after 30s without new events',
+      '  --tail                   Follow live events after replaying history, then',
+      '                           stop automatically after 30s with no new events',
+      '  --timeout <duration>     Also stop tailing after this absolute duration',
       '',
     ].join('\n')
   );

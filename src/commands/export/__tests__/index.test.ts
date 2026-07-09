@@ -86,7 +86,7 @@ describe('export command', () => {
     try {
       await runExportCli(['--help']);
       expect(String(write.mock.calls[0][0])).toContain(
-        'Tail also stops after 30s without new events'
+        'stop automatically after 30s with no new events'
       );
     } finally {
       write.mockRestore();
