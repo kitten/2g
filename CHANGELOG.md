@@ -1,5 +1,19 @@
 # 2g
 
+## 0.3.0
+
+### Minor Changes
+
+- Make initial `log.span` call not accept arguments, to prevent merging and split event construction
+  Submitted by [@kitten](https://github.com/kitten) (See [#7](https://github.com/kitten/2g/pull/7))
+
+### Patch Changes
+
+- Assign unique ID to child process threads
+  Submitted by [@kitten](https://github.com/kitten) (See [#5](https://github.com/kitten/2g/pull/5))
+- Improve help docs for debugging
+  Submitted by [@kitten](https://github.com/kitten) (See [#4](https://github.com/kitten/2g/pull/4))
+
 ## 0.2.0
 
 ### Minor Changes
