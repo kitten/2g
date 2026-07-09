@@ -11,7 +11,12 @@ import { parseHelp } from './commands/shared';
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv;
 
-  if (!command || command === '--help' || command === '-h') {
+  if (
+    !command ||
+    command === '--help' ||
+    command === '-h' ||
+    command === 'help'
+  ) {
     printHelp();
     return 0;
   }
