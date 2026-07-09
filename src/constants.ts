@@ -23,5 +23,10 @@ export const SESSION_FILES = {
 
 export const DEFAULT_SEGMENTS = 3;
 export const DEFAULT_SEGMENT_SIZE = 512 * 1024;
+
+// Debug recording emits far more events, so retain a larger ring buffer
+export const DEBUG_SEGMENTS = 6;
+export const DEBUG_SEGMENT_SIZE = 1024 * 1024;
+
 export const DEFAULT_RETAIN_MS = 7 * 24 * 60 * 60 * 1000;
 export const DEFAULT_MAX_SESSIONS = 100;
