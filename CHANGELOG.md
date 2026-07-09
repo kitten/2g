@@ -1,5 +1,12 @@
 # 2g
 
+## 0.4.1
+
+### Patch Changes
+
+- ⚠️ Fix drain on SIGINT/SIGTERM on `2g record`
+  Submitted by [@kitten](https://github.com/kitten) (See [#12](https://github.com/kitten/2g/pull/12))
+
 ## 0.4.0
 
 ### Minor Changes
