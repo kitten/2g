@@ -1,5 +1,12 @@
 # 2g
 
+## 0.3.1
+
+### Patch Changes
+
+- ⚠️ Fix missing child `_w` IDs on piped events and auto-install in child workers
+  Submitted by [@kitten](https://github.com/kitten) (See [#8](https://github.com/kitten/2g/pull/8))
+
 ## 0.3.0
 
 ### Minor Changes
