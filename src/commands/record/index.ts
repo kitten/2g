@@ -126,7 +126,7 @@ function printRecordHelp() {
       '                           category:kind; * wildcards; comma-separated',
       '  --spans                  Keep only span events (log.span() pairs with a _d',
       '                           duration); omit to include point events too',
-      '  --debug                  Include debug events (no LOG_DEBUG needed here)',
+      '  --debug                  Enable and export debug events; no LOG_DEBUG needed',
       '',
       'Example:',
       '  2g record -o trace.json -- expo export   # run & trace a build end-to-end',
