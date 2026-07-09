@@ -1,7 +1,10 @@
+import { installChildEventLogger } from './install';
+
 export { events } from './events';
 
 export {
   installEventLogger,
+  installChildEventLogger,
   flushEventLogger,
   getEventLoggerInfo,
   type EventLoggerInfo,
@@ -19,3 +22,5 @@ export type {
   SerializedError,
   SpanEnd,
 } from './types';
+
+installChildEventLogger();
