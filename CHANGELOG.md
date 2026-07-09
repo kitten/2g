@@ -1,5 +1,17 @@
 # 2g
 
+## 0.4.0
+
+### Minor Changes
+
+- Add new `record -- [command]` sub-command to export traces for full command runs
+  Submitted by [@kitten](https://github.com/kitten) (See [#10](https://github.com/kitten/2g/pull/10))
+
+### Patch Changes
+
+- Adjust help output and limits to prevent agents from running into cut-off trace outputs/logs
+  Submitted by [@kitten](https://github.com/kitten) (See [#10](https://github.com/kitten/2g/pull/10))
+
 ## 0.3.1
 
 ### Patch Changes
