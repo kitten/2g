@@ -48,6 +48,16 @@ export async function runRecordCli(args: string[]) {
   );
   capture.attach(child);
 
+  const onSignal = (signal: NodeJS.Signals) => {
+    if (signal !== 'SIGINT') {
+      try {
+        child.kill(signal);
+      } catch {}
+    }
+  };
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+
   const exited = new Promise<number>((resolve, reject) => {
     child.on('exit', code => resolve(code ?? 0));
     child.on('error', error =>
@@ -57,18 +67,24 @@ export async function runRecordCli(args: string[]) {
 
   const meta = { pid: child.pid, processName: command.join(' ') };
   const filtered = filterEvents(capture, options);
-  // Draining the events resolves once the child closes its event pipe (on exit)
-  const file =
-    options.format === 'opentelemetry'
-      ? await convertToOpenTelemetry(filtered, meta)
-      : await convertToChromeTrace(filtered, meta);
-  const exitCode = await exited;
 
-  const output = JSON.stringify(file, null, 2);
-  if (options.output) fs.writeFileSync(options.output, `${output}\n`);
-  else process.stdout.write(`${output}\n`);
+  try {
+    // Draining the events resolves once the child closes its event pipe (on exit)
+    const file =
+      options.format === 'opentelemetry'
+        ? await convertToOpenTelemetry(filtered, meta)
+        : await convertToChromeTrace(filtered, meta);
+    const exitCode = await exited;
 
-  if (exitCode) process.exitCode = exitCode;
+    const output = JSON.stringify(file, null, 2);
+    if (options.output) fs.writeFileSync(options.output, `${output}\n`);
+    else process.stdout.write(`${output}\n`);
+
+    if (exitCode) process.exitCode = exitCode;
+  } finally {
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+  }
 }
 
 function parseRecordOptions(args: string[]) {
