@@ -86,7 +86,7 @@ describe('export command', () => {
     try {
       await runExportCli(['--help']);
       expect(String(write.mock.calls[0][0])).toContain(
-        'stop automatically after 30s with no new events'
+        'automatically on 30s idle'
       );
     } finally {
       write.mockRestore();

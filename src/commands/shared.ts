@@ -32,11 +32,11 @@ export interface SharedTapOptions {
 // Warns (via console.warn → stderr, so it never pollutes the JSON/JSONL on
 // stdout, and stays mockable in tests) when segment rotation has already
 // dropped the start of the run from the retained window.
-export async function warnOnRotationLoss(sessionDir: string, command: string) {
+export async function warnOnRotationLoss(sessionDir: string, remedy: string) {
   if (!(await detectRotationLoss(sessionDir))) return;
   console.warn(
     `⚠ Earlier events were rotated out of the retained window.\n` +
-      `  For a complete trace, start \`${command} --tail\` before the workload.`
+      `  For a complete trace, start \`${remedy}\` before the workload.`
   );
 }
 

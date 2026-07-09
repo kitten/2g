@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { printCleanHelp, runCleanCli } from './commands/clean';
 import { runExportCli } from './commands/export';
 import { printPsHelp, runPsCli } from './commands/ps';
+import { runRecordCli } from './commands/record';
 import { runTapCli } from './commands/tap';
 import { parseHelp } from './commands/shared';
 
@@ -38,6 +39,9 @@ export async function main(argv = process.argv.slice(2)) {
       }
       runCleanCli(args);
       return 0;
+    case 'record':
+      await runRecordCli(args);
+      return 0;
     case 'export':
       await runExportCli(args);
       return 0;
@@ -62,6 +66,10 @@ function printHelp() {
       '    --since <time>  --filter <pattern>  --spans  --debug  --format pretty',
       '    --tail (follow live events after replay; runs until killed)',
       '',
+      '  record -- <command>          Run a command, trace it end-to-end, write on exit',
+      '    -o, --output <file>  --format chrome-trace|opentelemetry  --json',
+      '    --filter <pattern>  --spans  --debug',
+      '',
       '  export [selector]             Export events to Chrome Trace or OTLP JSON',
       '    --input <jsonl-file>  -o, --output <file>  --json',
       '    --format chrome-trace|opentelemetry',
@@ -80,10 +88,10 @@ function printHelp() {
       '  2g tap "expo start" --since 5m --format pretty   # recent history, readable',
       '  2g tap "expo start" --filter metro:bundling      # narrow to one area',
       '',
-      'Record a run with --tail (start it before the workload): replays history,',
-      'follows live, stops on 30s idle. Without it, export may be partial.',
-      '  2g export "expo start" --tail -o trace.json      # capture end-to-end',
-      '  2g export "expo start" -o trace.json             # after the fact',
+      'Trace a run to a flame chart:',
+      '  2g record -o trace.json -- expo export           # run & trace a build',
+      '  2g export "expo start" --tail -o trace.json      # attach to a running server',
+      '  2g export "expo start" -o trace.json             # after the fact (partial)',
       '',
       'Selectors match sessions by substring of PID, CWD, or command. If several',
       'match, and exactly one of them is running, it is chosen; otherwise 2g errors',

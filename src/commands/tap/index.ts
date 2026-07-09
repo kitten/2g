@@ -18,7 +18,7 @@ export async function runTapCli(args: string[]) {
   const options = parseTapOptions(args);
   if (options.json) redirectConsoleToStderr();
   const session = await resolveSession(options.selector);
-  await warnOnRotationLoss(session.sessionDir, '2g tap');
+  await warnOnRotationLoss(session.sessionDir, '2g tap --tail');
   const colorizePretty = shouldColorizeStream(process.stdout);
   for await (const event of tap(session.sessionDir, options)) {
     if (options.pretty) {

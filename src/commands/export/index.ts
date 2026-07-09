@@ -36,7 +36,7 @@ export async function runExportCli(args: string[]) {
     const session = await resolveSession(options.selector);
     processName = formatSessionProcessName(session);
     exportPid = session.pid;
-    await warnOnRotationLoss(session.sessionDir, '2g export');
+    await warnOnRotationLoss(session.sessionDir, '2g export --tail');
     events = tap(session.sessionDir, {
       follow: options.follow,
       debug: options.debug,
@@ -116,9 +116,8 @@ function printExportHelp() {
       '',
       'Exports session events to Chrome Trace or OTLP JSON.',
       '',
-      'Prefer --tail to capture a run end-to-end: start it before the workload and it',
-      'replays history, follows live, and self-terminates on 30s idle. Without --tail',
-      'it exports only the retained window, which may be partial under load.',
+      'With --tail (start it before the workload) it captures a run end-to-end and',
+      'stops on 30s idle. Without --tail it reads only the retained window (partial).',
       '',
       'Options:',
       '  selector                 Substring of PID, CWD, or command; a running',
@@ -135,8 +134,8 @@ function printExportHelp() {
       '                           plain "ms" payload field is not a span',
       '  --debug                  Include debug events (only recorded when the',
       '                           command ran with LOG_DEBUG set)',
-      '  --tail                   Follow live events after replaying history, then',
-      '                           stop automatically after 30s with no new events',
+      '  --tail                   Follow live events after replaying history; stops',
+      '                           automatically on 30s idle',
       '  --timeout <duration>     Also stop tailing after this absolute duration',
       '',
     ].join('\n')
