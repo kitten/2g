@@ -69,12 +69,12 @@ describe('api', () => {
     };
 
     debug('probe', { hit: true });
-    debug.span('op')('op', { ok: true });
+    debug.span()('op', { ok: true });
     expect(lines).toHaveLength(0);
 
     eventLogState.debug = true;
     debug('probe', { hit: true });
-    const end = debug.span('op');
+    const end = debug.span();
     end('op', { ok: true });
     events('custom')('ready');
 
@@ -461,8 +461,8 @@ describe('api', () => {
       await waitFor(() => received.join('').includes('"root:init"'));
       expect(JSON.parse(received.join('').trim())).toMatchObject({
         _e: 'root:init',
-        _w: 'event_log_child:parent-7',
-        processOrigin: { kind: 'event_log_child', id: 'parent-7' },
+        _w: `event_log_child:${process.pid}`,
+        processOrigin: { kind: 'event_log_child', id: String(process.pid) },
       });
     } finally {
       client?.destroy();
