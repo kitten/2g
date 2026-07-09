@@ -44,18 +44,18 @@ function createEventLogger<const Category extends string>(
       );
   }
 
-  log.span = function span(_event: string, data?: Record<string, unknown>) {
+  log.span = function span() {
     if (!eventLogState.primarySink || (level && !eventLogState.debug))
       return NOOP_DONE;
     const start = performance.now();
-    return function done(event: string, endData?: Record<string, unknown>) {
+    return function done(event: string, data?: Record<string, unknown>) {
       if (!eventLogState.primarySink) return;
       writeCompleteEvent(
         eventLogState.primarySink,
         category,
         event,
         data,
-        endData,
+        undefined,
         performance.now() - start,
         eventLogState.eventMeta,
         level

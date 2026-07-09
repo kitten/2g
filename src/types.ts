@@ -76,10 +76,7 @@ export interface EventLogger<Category extends string> {
     event: Name,
     ...args: PayloadArgs<EventPayload<Category, Name>>
   ): void;
-  span<Name extends EventNamesFor<Category>>(
-    event: Name,
-    ...args: PayloadArgs<EventPayload<Category, Name>>
-  ): SpanEnd<Category>;
+  span(): SpanEnd<Category>;
   path(target: string): Serialized<string>;
   path(target: string | null | undefined): Serialized<string | null>;
   error(error: Error): Serialized<SerializedError>;
