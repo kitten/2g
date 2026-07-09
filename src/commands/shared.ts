@@ -3,7 +3,7 @@ import { createInterface } from 'node:readline';
 import type { Readable } from 'node:stream';
 import { parseArgs } from 'node:util';
 
-import type { ListedSession } from '../tap';
+import { detectRotationLoss, type ListedSession } from '../tap';
 import {
   compileEventFilter,
   matchesTapOptions,
@@ -27,6 +27,17 @@ export interface SharedTapOptions {
   spans?: boolean;
   debug?: boolean;
   follow: boolean;
+}
+
+// Warns (via console.warn → stderr, so it never pollutes the JSON/JSONL on
+// stdout, and stays mockable in tests) when segment rotation has already
+// dropped the start of the run from the retained window.
+export async function warnOnRotationLoss(sessionDir: string, command: string) {
+  if (!(await detectRotationLoss(sessionDir))) return;
+  console.warn(
+    `⚠ Earlier events were rotated out of the retained window.\n` +
+      `  For a complete trace, start \`${command} --tail\` before the workload.`
+  );
 }
 
 export function formatSessionProcessName(session: ListedSession) {

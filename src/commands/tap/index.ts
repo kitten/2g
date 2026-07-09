@@ -3,7 +3,12 @@ import { parseArgs } from 'node:util';
 import { resolveSession, tap } from '../../tap';
 import { redirectConsoleToStderr } from '../../utils/redirectConsole';
 import { formatPrettyEvent, shouldColorizeStream } from '../../utils/pretty';
-import { parseHelp, parseSharedTapOptions, tapArgOptions } from '../shared';
+import {
+  parseHelp,
+  parseSharedTapOptions,
+  tapArgOptions,
+  warnOnRotationLoss,
+} from '../shared';
 
 export async function runTapCli(args: string[]) {
   if (parseHelp(args)) {
@@ -13,6 +18,7 @@ export async function runTapCli(args: string[]) {
   const options = parseTapOptions(args);
   if (options.json) redirectConsoleToStderr();
   const session = await resolveSession(options.selector);
+  await warnOnRotationLoss(session.sessionDir, '2g tap');
   const colorizePretty = shouldColorizeStream(process.stdout);
   for await (const event of tap(session.sessionDir, options)) {
     if (options.pretty) {

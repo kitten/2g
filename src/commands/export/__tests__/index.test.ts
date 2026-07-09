@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { INTERNAL_IPC_ENV } from '../../../constants';
 import { _setSessionBaseDir } from '../../../clean';
@@ -10,6 +10,14 @@ import { createSession } from '../../../session';
 import { runExportCli } from '../index';
 
 describe('export command', () => {
+  // Truncated fixtures trip the rotation-loss warning; keep it out of test output
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('defaults to Chrome Trace JSON output', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-export-'));
     const input = path.join(dir, 'events.jsonl');

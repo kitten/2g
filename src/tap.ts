@@ -161,6 +161,38 @@ export async function* tap(
   if (idleTimer) clearTimeout(idleTimer);
 }
 
+// Rotation discards the oldest segment once the ring fills, so a retained
+// window whose oldest event is not the session's start has lost earlier events.
+export async function detectRotationLoss(sessionDir: string): Promise<boolean> {
+  const meta = readMetaSync(sessionDir);
+  const maxSegments = meta?.maxSegments ?? DEFAULT_SEGMENTS;
+  // The oldest retained segment is the highest-numbered file still present
+  for (let index = maxSegments - 1; index >= 0; index--) {
+    const handle = await fs
+      .open(path.join(sessionDir, `${index}.jsonl`), 'r')
+      .catch(() => null);
+    if (!handle) continue;
+    try {
+      const first = await readFirstLine(handle);
+      // An empty window has lost nothing; otherwise loss iff it skips the start
+      return first != null && !isSessionStartLine(first);
+    } finally {
+      await handle.close().catch(() => {});
+    }
+  }
+  return false;
+}
+
+async function readFirstLine(handle: fs.FileHandle) {
+  for await (const line of readLines(handle)) return line;
+  return null;
+}
+
+function isSessionStartLine(line: string) {
+  // Every session opens with a root:init event (see installEventLogger)
+  return line.startsWith('{"_e":"root:init"');
+}
+
 async function openHistoryFiles(sessionDir: string, meta: SessionMeta | null) {
   const maxSegments = meta?.maxSegments ?? DEFAULT_SEGMENTS;
   const handles = await Promise.all(

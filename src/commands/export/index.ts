@@ -13,6 +13,7 @@ import {
   readJsonlFile,
   readJsonlStdin,
   tapArgOptions,
+  warnOnRotationLoss,
 } from '../shared';
 import { convertToChromeTrace } from './chromeTrace';
 import { convertToOpenTelemetry } from './opentelemetry';
@@ -35,6 +36,7 @@ export async function runExportCli(args: string[]) {
     const session = await resolveSession(options.selector);
     processName = formatSessionProcessName(session);
     exportPid = session.pid;
+    await warnOnRotationLoss(session.sessionDir, '2g export');
     events = tap(session.sessionDir, {
       follow: options.follow,
       debug: options.debug,
