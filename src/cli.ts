@@ -70,7 +70,7 @@ function printHelp() {
       '    -o, --output <file>  --format chrome-trace|opentelemetry  --json',
       '    --filter <pattern>  --spans  --debug',
       '',
-      '  export [selector]             Export a past or live (--tail) session to a trace',
+      '  export [selector]             Export a past or live (--tail) session',
       '    --input <jsonl-file>  -o, --output <file>  --json',
       '    --format chrome-trace|opentelemetry',
       '    --since <time>  --filter <pattern>  --spans  --debug',
