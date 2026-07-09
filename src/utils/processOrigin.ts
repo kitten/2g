@@ -29,7 +29,7 @@ export function getProcessOrigin(): ProcessOrigin | null {
   if (inheritedOrigin && inheritedOrigin !== localOrigin) {
     return {
       kind: 'event_log_child',
-      id: inheritedOrigin,
+      id: String(process.pid),
     };
   }
 
