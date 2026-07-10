@@ -1,5 +1,12 @@
 # 2g
 
+## 0.4.2
+
+### Patch Changes
+
+- Clarify `--debug` and `LOG_DEBUG` even more clearly
+  Submitted by [@kitten](https://github.com/kitten) (See [#14](https://github.com/kitten/2g/pull/14))
+
 ## 0.4.1
 
 ### Patch Changes
