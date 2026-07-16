@@ -406,9 +406,13 @@ describe('install explicit file target', () => {
         childStream!.flush!(resolve)
       );
 
-      await waitFor(async () =>
-        (await fs.readFile(file, 'utf8')).includes('child:explicit')
-      );
+      await waitFor(async () => {
+        try {
+          return (await fs.readFile(file, 'utf8')).includes('child:explicit');
+        } catch {
+          return false;
+        }
+      });
     } finally {
       childStream?.destroy();
       vi.resetModules();
