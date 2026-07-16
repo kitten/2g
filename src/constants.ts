@@ -12,6 +12,7 @@ export const EVENT_LEVEL_DEBUG = 1;
 export const EVENT_LOG_STATE_VERSION = 1;
 export const LOG_DEBUG_ENV = 'LOG_DEBUG';
 export const LOG_EVENTS_ENV = 'LOG_EVENTS';
+export const INTERNAL_DEBUG_ENV = '__eventLogDebug';
 export const INTERNAL_IPC_ENV = '__eventLogIpc';
 export const INTERNAL_PROCESS_ORIGIN_ENV = '__eventLogProcessOrigin';
 

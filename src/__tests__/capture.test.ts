@@ -6,7 +6,11 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { LOG_DEBUG_ENV, LOG_EVENTS_ENV } from '../constants';
+import {
+  INTERNAL_DEBUG_ENV,
+  LOG_DEBUG_ENV,
+  LOG_EVENTS_ENV,
+} from '../constants';
 import { captureEvents, type EventCapture } from '../capture';
 
 const INDEX_PATH = fileURLToPath(new URL('../index.ts', import.meta.url));
@@ -66,6 +70,13 @@ describe('captureEvents', () => {
     expect(options.stdio).toEqual(['ignore', 'pipe', 'inherit', 'pipe']);
     expect(options.env[LOG_EVENTS_ENV]).toBe('3');
     expect(options.env.FOO).toBe('bar');
+    expect(options.env[INTERNAL_DEBUG_ENV]).toBeUndefined();
+
+    const debugOptions = captureEvents({ debug: true }).spawnOptions({
+      env: { [LOG_DEBUG_ENV]: '' },
+    });
+    expect(debugOptions.env[LOG_DEBUG_ENV]).toBe('');
+    expect(debugOptions.env[INTERNAL_DEBUG_ENV]).toBe('1');
 
     const defaults = captureEvents().spawnOptions();
     expect(defaults.stdio).toEqual(['inherit', 'inherit', 'inherit', 'pipe']);
@@ -125,6 +136,34 @@ describe('captureEvents', () => {
       'alpha:noise',
     ]);
     expect(received[1]._l).toBe(1);
+  });
+
+  it('enables debug events in worker threads when capture debug is enabled', async () => {
+    const capture = captureEvents({ debug: true, filter: 'alpha:*' });
+    const workerScript = `
+      const { parentPort } = require('node:worker_threads');
+      const { events, flushEventLogger } = require(${JSON.stringify(INDEX_PATH)});
+      events.debug('alpha')('worker-noise');
+      flushEventLogger().then(() => parentPort.postMessage('done'));
+    `;
+    const child = spawnChild(
+      capture,
+      `installEventLogger();
+       const { Worker } = require('node:worker_threads');
+       const worker = new Worker(${JSON.stringify(workerScript)}, { eval: true });
+       worker.on('message', async () => {
+         await flushEventLogger();
+       });`
+    );
+
+    const received = await capture.attach(child).collect();
+    expect(received).toEqual([
+      expect.objectContaining({
+        _e: 'alpha:worker-noise',
+        _l: 1,
+        _w: expect.stringMatching(/^worker_thread:/),
+      }),
+    ]);
   });
 
   it('drains the pipe while the child writes past the pipe buffer', async () => {

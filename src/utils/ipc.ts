@@ -1,7 +1,17 @@
 import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
 
-import { INTERNAL_IPC_ENV } from '../constants';
-import type { LogStreamOpener } from './logStream';
+import {
+  INTERNAL_DEBUG_ENV,
+  INTERNAL_IPC_ENV,
+  LOG_DEBUG_ENV,
+  LOG_EVENTS_ENV,
+} from '../constants';
+import { eventLogState } from '../state';
+import type { EventSink, LogStream, LogStreamOpener } from './logStream';
+import { registerProcessCleanup } from './processExit';
+import { listenSocket, removeSocket } from './sessionSockets';
 
 const CONNECT_RETRY_MS = 50;
 const MAX_CONNECT_RETRY_MS = 750;
@@ -10,12 +20,67 @@ export function getParentIpcPath() {
   return process.env[INTERNAL_IPC_ENV];
 }
 
-export function publishIpcPath(socketPath: string) {
+export function isParentDebugEnabled() {
+  return process.env[INTERNAL_DEBUG_ENV] === '1';
+}
+
+function publishIpcPath(socketPath: string) {
   process.env[INTERNAL_IPC_ENV] = socketPath;
   return () => {
     if (process.env[INTERNAL_IPC_ENV] === socketPath)
       delete process.env[INTERNAL_IPC_ENV];
   };
+}
+
+export function listenIpcSink(sink: EventSink, socketPath: string) {
+  const server = net.createServer(socket => ingestIpcSocket(socket, sink));
+  const closeServer = listenSocket(server, socketPath);
+  const restoreIpcPath = publishIpcPath(socketPath);
+  const isDebug = eventLogState.debug;
+  if (isDebug) {
+    process.env[INTERNAL_DEBUG_ENV] = '1';
+  }
+
+  delete process.env[LOG_DEBUG_ENV];
+  delete process.env[LOG_EVENTS_ENV];
+
+  return () => {
+    closeServer();
+    restoreIpcPath();
+    if (isDebug) {
+      delete process.env[INTERNAL_DEBUG_ENV];
+    }
+  };
+}
+
+function createTempIpcPath() {
+  const now = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2, 10);
+  const id = `${process.pid}-${now}-${rand}`;
+  return process.platform === 'win32'
+    ? `\\\\.\\pipe\\event-log-${id}-ipc`
+    : path.join(os.tmpdir(), `event-log-${id}.sock`);
+}
+
+export function publishTempIpcSink(sink: LogStream) {
+  const socketPath = createTempIpcPath();
+  const closeIpc = listenIpcSink(sink, socketPath);
+  let cleanedUp = false;
+
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    closeIpc();
+    removeSocket(socketPath);
+  };
+
+  const destroy = sink.destroy.bind(sink);
+  sink.destroy = () => {
+    cleanup();
+    destroy();
+  };
+  sink.once('close', cleanup);
+  registerProcessCleanup(cleanup);
 }
 
 export interface OpenIpcOptions {
@@ -68,4 +133,25 @@ export function openIpc(
     };
     attempt();
   };
+}
+
+export function ingestIpcSocket(socket: net.Socket, sink: EventSink) {
+  // Forward complete lines as one block; hold back only the partial tail.
+  let pending = '';
+  socket.unref();
+  socket.setEncoding('utf8');
+  socket.on('data', (chunk: string) => {
+    const data = pending ? pending + chunk : chunk;
+    const end = data.lastIndexOf('\n');
+    if (end === data.length - 1) {
+      pending = '';
+      sink._writeln(data);
+    } else if (end === -1) {
+      pending = data;
+    } else {
+      pending = data.slice(end + 1);
+      sink._writeln(data.slice(0, end + 1));
+    }
+  });
+  socket.on('error', () => {});
 }

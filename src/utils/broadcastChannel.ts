@@ -1,5 +1,6 @@
 import type net from 'node:net';
 
+import { ingestIpcSocket } from './ipc';
 import { LogStream, type EventSink } from './logStream';
 
 const MAX_SUBSCRIBER_BUFFERED = 4 * 1024 * 1024;
@@ -117,24 +118,7 @@ export class BroadcastChannel implements EventSink {
   }
 
   ingest(socket: net.Socket) {
-    // Forward complete lines as one block; hold back only the partial tail
-    let pending = '';
-    socket.unref();
-    socket.setEncoding('utf8');
-    socket.on('data', (chunk: string) => {
-      const data = pending ? pending + chunk : chunk;
-      const end = data.lastIndexOf('\n');
-      if (end === data.length - 1) {
-        pending = '';
-        this._writeln(data);
-      } else if (end === -1) {
-        pending = data;
-      } else {
-        pending = data.slice(end + 1);
-        this._writeln(data.slice(0, end + 1));
-      }
-    });
-    socket.on('error', () => {});
+    ingestIpcSocket(socket, this);
   }
 
   _writeln(line: string): boolean {

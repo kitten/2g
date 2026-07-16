@@ -15,7 +15,7 @@ import { createDebugSink } from './debug';
 import { eventLogState } from './state';
 import { BroadcastChannel } from './utils/broadcastChannel';
 import { LogStream, type EventSink } from './utils/logStream';
-import { publishIpcPath } from './utils/ipc';
+import { listenIpcSink } from './utils/ipc';
 import { publishProcessOrigin } from './utils/processOrigin';
 import { registerProcessCleanup } from './utils/processExit';
 import {
@@ -93,10 +93,8 @@ export function createSession(options: SessionOptions): SessionContext {
   trackSegmentRotation(fileStream, sessionDir, maxSegments, maxSegmentSize);
 
   const liveServer = net.createServer(socket => sink.attach(socket));
-  const ipcServer = net.createServer(socket => sink.ingest(socket));
   const closeLiveServer = listenSocket(liveServer, liveSocket.path);
-  const closeIpcServer = listenSocket(ipcServer, ipcSocket.path);
-  const restoreIpcPath = publishIpcPath(ipcSocket.path);
+  const closeIpcServer = listenIpcSink(sink, ipcSocket.path);
   const restoreProcessOrigin = publishProcessOrigin();
 
   const meta: SessionMeta = {
@@ -123,7 +121,6 @@ export function createSession(options: SessionOptions): SessionContext {
     sink.destroy();
     closeLiveServer();
     closeIpcServer();
-    restoreIpcPath();
     restoreProcessOrigin();
     // rmSync can throw EPERM/EBUSY and must not skip the restoration above
     removeSocket(liveSocket.path);

@@ -14,7 +14,12 @@ import {
   type LogStreamOpener,
   type LogStreamOptions,
 } from './utils/logStream';
-import { getParentIpcPath, openIpc } from './utils/ipc';
+import {
+  getParentIpcPath,
+  isParentDebugEnabled,
+  openIpc,
+  publishTempIpcSink,
+} from './utils/ipc';
 import { getProcessOrigin, getProcessWorkerId } from './utils/processOrigin';
 import { redirectConsoleForFd } from './utils/redirectConsole';
 
@@ -41,7 +46,9 @@ export function installChildEventLogger(
 
   const ipcPath = getParentIpcPath();
   if (ipcPath) {
-    eventLogState.debug = options?.debug ?? !!process.env[LOG_DEBUG_ENV];
+    eventLogState.debug =
+      options?.debug ??
+      (isParentDebugEnabled() || !!process.env[LOG_DEBUG_ENV]);
     connectToParent(ipcPath);
     return true;
   } else {
@@ -74,7 +81,9 @@ export function installEventLogger(
       redirectConsoleForFd(explicitTarget);
     eventLogState.debug = options?.debug ?? true;
     eventLogState.eventLoggerInfo = getExplicitTargetInfo(explicitTarget);
-    activateSink(createPrimarySink(explicitTarget));
+    const sink = createPrimarySink(explicitTarget);
+    publishTempIpcSink(sink);
+    activateSink(sink);
     return;
   }
 
@@ -85,6 +94,7 @@ export function installEventLogger(
     eventLogState.eventLoggerInfo = {
       destination: 'session',
       isUserVisibleOutput: false,
+      debug: eventLogState.debug,
       sessionDir: session.sessionDir,
     };
     activateSink(session.sink, options.version);
@@ -141,6 +151,7 @@ function getExplicitTargetInfo(target: string | number): EventLoggerInfo {
     return {
       destination: target === 1 ? 'stdout' : target === 2 ? 'stderr' : 'fd',
       isUserVisibleOutput: target === 1 || target === 2,
+      debug: eventLogState.debug,
       fd: target,
     };
   }
@@ -148,6 +159,7 @@ function getExplicitTargetInfo(target: string | number): EventLoggerInfo {
   return {
     destination: 'file',
     isUserVisibleOutput: false,
+    debug: eventLogState.debug,
     file: target,
   };
 }
@@ -173,6 +185,7 @@ function connectToParent(ipcPath: string) {
   eventLogState.eventLoggerInfo = {
     destination: 'ipc',
     isUserVisibleOutput: false,
+    debug: eventLogState.debug,
   };
   rootEvent('init', getInitMetadata());
 }

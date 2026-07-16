@@ -10,6 +10,7 @@ import {
   DEFAULT_RETAIN_MS,
   EVENT_LOG_FORMAT_VERSION,
   EVENT_LOG_TMP_DIR,
+  INTERNAL_DEBUG_ENV,
   INTERNAL_IPC_ENV,
   LOG_DEBUG_ENV,
   LOG_EVENTS_ENV,
@@ -18,6 +19,8 @@ import {
 import { _setSessionBaseDir, getSessionBaseDir } from '../clean';
 import { createSession } from '../session';
 import { _resetEventLogState, eventLogState } from '../state';
+import { openIpc } from '../utils/ipc';
+import { LogStream } from '../utils/logStream';
 
 describe('install session', () => {
   it('creates session metadata before sockets are ready and forwards worker lines', async () => {
@@ -369,6 +372,56 @@ describe('install explicit file target', () => {
       restoreIpc();
       vi.resetModules();
       _resetEventLogState();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('publishes an IPC path for child writes with an explicit target', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-file-'));
+    const file = path.join(dir, 'events.jsonl');
+    const restoreDir = setSessionDir(dir);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const restoreDebugIpc = setEnv(INTERNAL_DEBUG_ENV, undefined);
+    const restoreDebug = setEnv(LOG_DEBUG_ENV, '*');
+    const restoreEvents = setEnv(LOG_EVENTS_ENV, file);
+    let childStream: LogStream | undefined;
+
+    try {
+      vi.resetModules();
+      const { installEventLogger } = await import('../install');
+      installEventLogger(file);
+
+      const ipcPath = process.env[INTERNAL_IPC_ENV];
+      expect(ipcPath).toBeTruthy();
+      if (process.platform !== 'win32') expect(ipcPath).not.toContain(dir);
+      expect(process.env[LOG_DEBUG_ENV]).toBeUndefined();
+      expect(process.env[LOG_EVENTS_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBe('1');
+
+      childStream = new LogStream(openIpc(ipcPath!), { closeFd: false });
+      childStream._writeln(
+        `${JSON.stringify({ _e: 'child:explicit', _t: Date.now() })}\n`
+      );
+      await new Promise<Error | null | undefined>(resolve =>
+        childStream!.flush!(resolve)
+      );
+
+      await waitFor(async () => {
+        try {
+          return (await fs.readFile(file, 'utf8')).includes('child:explicit');
+        } catch {
+          return false;
+        }
+      });
+    } finally {
+      childStream?.destroy();
+      vi.resetModules();
+      _resetEventLogState();
+      restoreDebug();
+      restoreDebugIpc();
+      restoreEvents();
+      restoreIpc();
+      restoreDir();
       await fs.rm(dir, { recursive: true, force: true });
     }
   });

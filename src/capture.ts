@@ -1,7 +1,7 @@
 import type { ChildProcess, StdioOptions } from 'node:child_process';
 import type { Readable } from 'node:stream';
 
-import { LOG_EVENTS_ENV } from './constants';
+import { INTERNAL_DEBUG_ENV, LOG_EVENTS_ENV } from './constants';
 import type { TapOptions } from './tap';
 import type { ParsedEvent } from './types';
 import { compileEventFilter, parseEventLine } from './utils/eventFilter';
@@ -40,13 +40,18 @@ export class EventCapture implements AsyncIterable<ParsedEvent> {
     while (stdio.length < 3) stdio.push('inherit');
     this.#index = stdio.length;
     stdio.push('pipe');
+    const env = {
+      ...(options?.env ?? process.env),
+      [LOG_EVENTS_ENV]: `${this.#index}`,
+    };
+    if (this.#options.debug === true) {
+      env[INTERNAL_DEBUG_ENV] = '1';
+    }
+
     return {
       ...(options as T),
       stdio,
-      env: {
-        ...(options?.env ?? process.env),
-        [LOG_EVENTS_ENV]: `${this.#index}`,
-      },
+      env,
     };
   }
 

@@ -250,9 +250,9 @@ inactive.
 
 #### `getEventLoggerInfo() => EventLoggerInfo | null`
 
-Returns the active destination — `{ destination, isUserVisibleOutput }` plus a `file`,
-`fd`, or `sessionDir` — or `null` when logging is inactive. `isUserVisibleOutput` is
-`true` when events write to stdout or stderr.
+Returns the active destination — `{ destination, isUserVisibleOutput, debug }` plus a
+`file`, `fd`, or `sessionDir` — or `null` when logging is inactive.
+`isUserVisibleOutput` is `true` when events write to stdout or stderr.
 
 #### `interface Serialized<T>`
 
