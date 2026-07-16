@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   INTERNAL_IPC_ENV,
+  INTERNAL_DEBUG_ENV,
   INTERNAL_PROCESS_ORIGIN_ENV,
   LOG_DEBUG_ENV,
   LOG_EVENTS_ENV,
@@ -508,6 +509,38 @@ describe('api', () => {
       restoreDebug();
       restoreLog();
       restoreOrigin();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('enables debug events from an inherited parent IPC debug flag', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-worker-'));
+    const socketPath = testSocketPath(dir, SESSION_FILES.ipcSocket);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, socketPath);
+    const restoreDebug = setEnv(INTERNAL_DEBUG_ENV, '1');
+    const restoreLog = setEnv(LOG_EVENTS_ENV, undefined);
+    const received: string[] = [];
+    let client: net.Socket | undefined;
+    const server = net.createServer(socket => {
+      client = socket;
+      socket.on('data', chunk => received.push(chunk.toString('utf8')));
+    });
+    await new Promise<void>(resolve => server.listen(socketPath, resolve));
+    vi.resetModules();
+
+    try {
+      const { installEventLogger } = await import('../install');
+      const { events, flushEventLogger } = await import('../index');
+      installEventLogger();
+      events.debug('custom')('verbose', {});
+      await flushEventLogger();
+      await waitFor(() => received.join('').includes('"custom:verbose"'));
+    } finally {
+      client?.destroy();
+      server.close();
+      restoreIpc();
+      restoreDebug();
+      restoreLog();
       await fs.rm(dir, { recursive: true, force: true });
     }
   });

@@ -14,7 +14,12 @@ import {
   type LogStreamOpener,
   type LogStreamOptions,
 } from './utils/logStream';
-import { getParentIpcPath, openIpc, publishTempIpcSink } from './utils/ipc';
+import {
+  getParentIpcPath,
+  isParentDebugEnabled,
+  openIpc,
+  publishTempIpcSink,
+} from './utils/ipc';
 import { getProcessOrigin, getProcessWorkerId } from './utils/processOrigin';
 import { redirectConsoleForFd } from './utils/redirectConsole';
 
@@ -41,7 +46,9 @@ export function installChildEventLogger(
 
   const ipcPath = getParentIpcPath();
   if (ipcPath) {
-    eventLogState.debug = options?.debug ?? !!process.env[LOG_DEBUG_ENV];
+    eventLogState.debug =
+      options?.debug ??
+      (isParentDebugEnabled() || !!process.env[LOG_DEBUG_ENV]);
     connectToParent(ipcPath);
     return true;
   } else {

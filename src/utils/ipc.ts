@@ -2,7 +2,8 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import { INTERNAL_IPC_ENV } from '../constants';
+import { INTERNAL_DEBUG_ENV, INTERNAL_IPC_ENV } from '../constants';
+import { eventLogState } from '../state';
 import type { EventSink, LogStream, LogStreamOpener } from './logStream';
 import { registerProcessCleanup } from './processExit';
 import { listenSocket, removeSocket } from './sessionSockets';
@@ -12,6 +13,10 @@ const MAX_CONNECT_RETRY_MS = 750;
 
 export function getParentIpcPath() {
   return process.env[INTERNAL_IPC_ENV];
+}
+
+export function isParentDebugEnabled() {
+  return process.env[INTERNAL_DEBUG_ENV] === '1';
 }
 
 export function publishIpcPath(socketPath: string) {
@@ -26,10 +31,17 @@ export function listenIpcSink(sink: EventSink, socketPath: string) {
   const server = net.createServer(socket => ingestIpcSocket(socket, sink));
   const closeServer = listenSocket(server, socketPath);
   const restoreIpcPath = publishIpcPath(socketPath);
+  const isDebug = eventLogState.debug;
+  if (isDebug) {
+    process.env[INTERNAL_DEBUG_ENV] = '1';
+  }
 
   return () => {
     closeServer();
     restoreIpcPath();
+    if (isDebug) {
+      delete process.env[INTERNAL_DEBUG_ENV];
+    }
   };
 }
 
