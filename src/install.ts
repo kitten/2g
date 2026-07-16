@@ -14,7 +14,7 @@ import {
   type LogStreamOpener,
   type LogStreamOptions,
 } from './utils/logStream';
-import { getParentIpcPath, openIpc } from './utils/ipc';
+import { getParentIpcPath, openIpc, publishTempIpcSink } from './utils/ipc';
 import { getProcessOrigin, getProcessWorkerId } from './utils/processOrigin';
 import { redirectConsoleForFd } from './utils/redirectConsole';
 
@@ -74,7 +74,9 @@ export function installEventLogger(
       redirectConsoleForFd(explicitTarget);
     eventLogState.debug = options?.debug ?? true;
     eventLogState.eventLoggerInfo = getExplicitTargetInfo(explicitTarget);
-    activateSink(createPrimarySink(explicitTarget));
+    const sink = createPrimarySink(explicitTarget);
+    publishTempIpcSink(sink);
+    activateSink(sink);
     return;
   }
 
