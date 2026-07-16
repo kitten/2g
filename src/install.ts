@@ -94,6 +94,7 @@ export function installEventLogger(
     eventLogState.eventLoggerInfo = {
       destination: 'session',
       isUserVisibleOutput: false,
+      debug: eventLogState.debug,
       sessionDir: session.sessionDir,
     };
     activateSink(session.sink, options.version);
@@ -150,6 +151,7 @@ function getExplicitTargetInfo(target: string | number): EventLoggerInfo {
     return {
       destination: target === 1 ? 'stdout' : target === 2 ? 'stderr' : 'fd',
       isUserVisibleOutput: target === 1 || target === 2,
+      debug: eventLogState.debug,
       fd: target,
     };
   }
@@ -157,6 +159,7 @@ function getExplicitTargetInfo(target: string | number): EventLoggerInfo {
   return {
     destination: 'file',
     isUserVisibleOutput: false,
+    debug: eventLogState.debug,
     file: target,
   };
 }
@@ -182,6 +185,7 @@ function connectToParent(ipcPath: string) {
   eventLogState.eventLoggerInfo = {
     destination: 'ipc',
     isUserVisibleOutput: false,
+    debug: eventLogState.debug,
   };
   rootEvent('init', getInitMetadata());
 }

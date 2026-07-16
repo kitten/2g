@@ -108,7 +108,10 @@ describe('api', () => {
       const output = await fs.readFile(logFile, 'utf8');
       expect(output).toContain('"custom:tick"');
       expect(output).toContain('"custom:verbose"');
-      expect(getEventLoggerInfo()).toMatchObject({ destination: 'file' });
+      expect(getEventLoggerInfo()).toMatchObject({
+        destination: 'file',
+        debug: true,
+      });
     } finally {
       restoreIpc();
       restoreLog();
@@ -154,6 +157,7 @@ describe('api', () => {
       events('custom')('tick', { n: 2 });
       await flushEventLogger();
       const info = getEventLoggerInfo();
+      expect(info).toMatchObject({ debug: false });
       const sessionDir =
         info?.destination === 'session' ? info.sessionDir : undefined;
       const output = await fs.readFile(
@@ -187,6 +191,7 @@ describe('api', () => {
       events.debug('custom')('verbose', { n: 1 });
       await flushEventLogger();
       const info = getEventLoggerInfo();
+      expect(info).toMatchObject({ debug: true });
       const sessionDir =
         info?.destination === 'session' ? info.sessionDir : undefined;
       expect(
@@ -217,6 +222,7 @@ describe('api', () => {
       events.debug('custom')('verbose', { n: 1 });
       await flushEventLogger();
       const info = getEventLoggerInfo();
+      expect(info).toMatchObject({ debug: true });
       const sessionDir =
         info?.destination === 'session' ? info.sessionDir : undefined;
       expect(
@@ -498,7 +504,10 @@ describe('api', () => {
       const { installEventLogger, getEventLoggerInfo } =
         await import('../install');
       installEventLogger();
-      expect(getEventLoggerInfo()).toMatchObject({ destination: 'ipc' });
+      expect(getEventLoggerInfo()).toMatchObject({
+        destination: 'ipc',
+        debug: true,
+      });
       await waitFor(() => received.join('').includes('"root:init"'));
       expect(write).not.toHaveBeenCalled();
     } finally {

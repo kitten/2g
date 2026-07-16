@@ -10,6 +10,7 @@ import {
   DEFAULT_RETAIN_MS,
   EVENT_LOG_FORMAT_VERSION,
   EVENT_LOG_TMP_DIR,
+  INTERNAL_DEBUG_ENV,
   INTERNAL_IPC_ENV,
   LOG_DEBUG_ENV,
   LOG_EVENTS_ENV,
@@ -380,7 +381,9 @@ describe('install explicit file target', () => {
     const file = path.join(dir, 'events.jsonl');
     const restoreDir = setSessionDir(dir);
     const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
-    const restoreEvents = setEnv(LOG_EVENTS_ENV, undefined);
+    const restoreDebugIpc = setEnv(INTERNAL_DEBUG_ENV, undefined);
+    const restoreDebug = setEnv(LOG_DEBUG_ENV, '*');
+    const restoreEvents = setEnv(LOG_EVENTS_ENV, file);
     let childStream: LogStream | undefined;
 
     try {
@@ -391,6 +394,9 @@ describe('install explicit file target', () => {
       const ipcPath = process.env[INTERNAL_IPC_ENV];
       expect(ipcPath).toBeTruthy();
       if (process.platform !== 'win32') expect(ipcPath).not.toContain(dir);
+      expect(process.env[LOG_DEBUG_ENV]).toBeUndefined();
+      expect(process.env[LOG_EVENTS_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBe('1');
 
       childStream = new LogStream(openIpc(ipcPath!), { closeFd: false });
       childStream._writeln(
@@ -407,6 +413,8 @@ describe('install explicit file target', () => {
       childStream?.destroy();
       vi.resetModules();
       _resetEventLogState();
+      restoreDebug();
+      restoreDebugIpc();
       restoreEvents();
       restoreIpc();
       restoreDir();

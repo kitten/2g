@@ -2,7 +2,12 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import { INTERNAL_DEBUG_ENV, INTERNAL_IPC_ENV } from '../constants';
+import {
+  INTERNAL_DEBUG_ENV,
+  INTERNAL_IPC_ENV,
+  LOG_DEBUG_ENV,
+  LOG_EVENTS_ENV,
+} from '../constants';
 import { eventLogState } from '../state';
 import type { EventSink, LogStream, LogStreamOpener } from './logStream';
 import { registerProcessCleanup } from './processExit';
@@ -35,6 +40,9 @@ export function listenIpcSink(sink: EventSink, socketPath: string) {
   if (isDebug) {
     process.env[INTERNAL_DEBUG_ENV] = '1';
   }
+
+  delete process.env[LOG_DEBUG_ENV];
+  delete process.env[LOG_EVENTS_ENV];
 
   return () => {
     closeServer();

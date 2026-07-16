@@ -5,6 +5,7 @@ import type { EventMeta } from './utils/serializeEvent';
 export interface EventLoggerInfo {
   destination: 'file' | 'stdout' | 'stderr' | 'fd' | 'session' | 'ipc';
   isUserVisibleOutput: boolean;
+  debug: boolean;
   file?: string;
   fd?: number;
   sessionDir?: string;
