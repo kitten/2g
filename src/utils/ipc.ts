@@ -19,7 +19,7 @@ export function isParentDebugEnabled() {
   return process.env[INTERNAL_DEBUG_ENV] === '1';
 }
 
-export function publishIpcPath(socketPath: string) {
+function publishIpcPath(socketPath: string) {
   process.env[INTERNAL_IPC_ENV] = socketPath;
   return () => {
     if (process.env[INTERNAL_IPC_ENV] === socketPath)
