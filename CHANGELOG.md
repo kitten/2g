@@ -1,5 +1,12 @@
 # 2g
 
+## 0.4.3
+
+### Patch Changes
+
+- ⚠️ Fix IPC for child process/worker threads not activating for explicit log targets, for example on `record`
+  Submitted by [@kitten](https://github.com/kitten) (See [#16](https://github.com/kitten/2g/pull/16))
+
 ## 0.4.2
 
 ### Patch Changes
