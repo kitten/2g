@@ -1,6 +1,6 @@
 {
   "name": "2g",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Low-overhead structured event logs for agents and developers",
   "author": "Phil Pluckthun <phil@kitten.sh>",
   "source": "./src/index.ts",

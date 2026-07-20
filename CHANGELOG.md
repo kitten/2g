@@ -1,5 +1,12 @@
 # 2g
 
+## 0.4.4
+
+### Patch Changes
+
+- Update `record` help output to mention `LOG_EVENTS` for raw debug output
+  Submitted by [@kitten](https://github.com/kitten) (See [#18](https://github.com/kitten/2g/pull/18))
+
 ## 0.4.3
 
 ### Patch Changes
