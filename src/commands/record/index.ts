@@ -149,6 +149,8 @@ function printRecordHelp() {
       '  2g record --debug -o trace.json -- <command>',
       'Normal app traces do not need this.',
       '',
+      'For raw JSONL debug output, use LOG_EVENTS=<file> directly instead of this command.',
+      '',
       'Example:',
       '  2g record -o trace.json -- expo export   # run & trace a build end-to-end',
       '',

@@ -39,6 +39,7 @@ describe('record command', () => {
       const output = String(write.mock.calls[0][0]);
       expect(output).toContain('-- <command>');
       expect(output).toContain('traces the events it emits');
+      expect(output).toContain('LOG_EVENTS=<file>');
     } finally {
       write.mockRestore();
     }
