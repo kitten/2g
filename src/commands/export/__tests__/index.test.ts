@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { INTERNAL_IPC_ENV } from '../../../constants';
-import { _setSessionBaseDir } from '../../../clean';
+import { _setSessionBaseDir } from '../../../discovery';
 import { createSession } from '../../../session';
 import { runExportCli } from '../index';
 

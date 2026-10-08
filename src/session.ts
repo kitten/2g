@@ -10,7 +10,8 @@ import {
   EVENT_LOG_FORMAT_VERSION,
   SESSION_FILES,
 } from './constants';
-import { cleanStaleSessionsSync, getSessionBaseDir } from './clean';
+import { cleanStaleSessionsSync } from './clean';
+import { getSessionBaseDir } from './discovery';
 import { createDebugSink } from './debug';
 import { eventLogState } from './state';
 import { BroadcastChannel } from './utils/broadcastChannel';

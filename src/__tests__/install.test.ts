@@ -19,7 +19,7 @@ import {
   LOG_EVENTS_ENV,
   SESSION_FILES,
 } from '../constants';
-import { _setSessionBaseDir, getSessionBaseDir } from '../clean';
+import { _setSessionBaseDir, getSessionBaseDir } from '../discovery';
 import { createSession } from '../session';
 import { _resetEventLogState, eventLogState } from '../state';
 import { openIpc } from '../utils/ipc';
@@ -278,7 +278,7 @@ describe('install session', () => {
     );
 
     try {
-      const { readMetaSync } = await import('../clean');
+      const { readMetaSync } = await import('../discovery');
       expect(readMetaSync(sessionDir)).toBeNull();
     } finally {
       restoreDir();
