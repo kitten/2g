@@ -14,6 +14,7 @@ import {
   EVENT_LOG_TMP_DIR,
   INTERNAL_DEBUG_ENV,
   INTERNAL_IPC_ENV,
+  INTERNAL_PROCESS_ORIGIN_ENV,
   LOG_DEBUG_ENV,
   LOG_EVENTS_ENV,
   SESSION_FILES,
@@ -430,6 +431,7 @@ describe('install explicit file target', () => {
     const file = path.join(dir, 'events.jsonl');
     const restoreDir = setSessionDir(dir);
     const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const restoreOrigin = setEnv(INTERNAL_PROCESS_ORIGIN_ENV, undefined);
     const restoreDebugIpc = setEnv(INTERNAL_DEBUG_ENV, undefined);
     const restoreDebug = setEnv(LOG_DEBUG_ENV, '*');
     const restoreEvents = setEnv(LOG_EVENTS_ENV, file);
@@ -442,6 +444,11 @@ describe('install explicit file target', () => {
 
       const ipcPath = process.env[INTERNAL_IPC_ENV];
       expect(ipcPath).toBeTruthy();
+      expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBe(
+        String(process.pid)
+      );
+      const { getProcessOrigin } = await import('../utils/processOrigin');
+      expect(getProcessOrigin()).toBeNull();
       if (process.platform !== 'win32') expect(ipcPath).not.toContain(dir);
       expect(process.env[LOG_DEBUG_ENV]).toBeUndefined();
       expect(process.env[LOG_EVENTS_ENV]).toBeUndefined();
@@ -462,6 +469,9 @@ describe('install explicit file target', () => {
           return false;
         }
       });
+      _resetEventLogState();
+      expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBeUndefined();
+      expect(getProcessOrigin()).toBeNull();
     } finally {
       childStream?.destroy();
       vi.resetModules();
@@ -470,6 +480,7 @@ describe('install explicit file target', () => {
       restoreDebugIpc();
       restoreEvents();
       restoreIpc();
+      restoreOrigin();
       restoreDir();
       await fs.rm(dir, { recursive: true, force: true });
     }

@@ -16,6 +16,7 @@ import type {
   LogStreamOpener,
 } from './logStream';
 import { registerProcessCleanup } from './processExit';
+import { publishProcessOrigin } from './processOrigin';
 import { listenSocket, removeSocket } from './sessionSockets';
 
 const CONNECT_RETRY_MS = 50;
@@ -48,6 +49,7 @@ export function listenIpcSink(sink: EventSink, socketPath: string) {
 
   delete process.env[LOG_DEBUG_ENV];
   delete process.env[LOG_EVENTS_ENV];
+  const restoreProcessOrigin = publishProcessOrigin();
 
   return () => {
     closeServer();
@@ -55,6 +57,7 @@ export function listenIpcSink(sink: EventSink, socketPath: string) {
     if (isDebug) {
       delete process.env[INTERNAL_DEBUG_ENV];
     }
+    restoreProcessOrigin();
   };
 }
 
