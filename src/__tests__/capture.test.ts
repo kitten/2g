@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   INTERNAL_DEBUG_ENV,
   INTERNAL_IPC_ENV,
+  INTERNAL_PROCESS_ORIGIN_ENV,
   LOG_DEBUG_ENV,
   LOG_EVENTS_ENV,
 } from '../constants';
@@ -65,6 +66,65 @@ function spawnChild(capture: EventCapture, script: string) {
 }
 
 describe('captureEvents', () => {
+  it.each(['file', 'fd'])(
+    'identifies ordinary children of an explicit %s target',
+    async target => {
+      const file = path.join(tmpDir, `origin-${target}.jsonl`);
+      const flags = [
+        '--experimental-transform-types',
+        '--no-warnings',
+        '--require',
+        hookPath,
+      ];
+      const childScript = `
+        const { events } = require(${JSON.stringify(INDEX_PATH)});
+        events('origin')('child', { pid: process.pid });
+      `;
+      const parentScript = `
+        const { installEventLogger, events, flushEventLogger } = require(${JSON.stringify(INDEX_PATH)});
+        const file = ${JSON.stringify(file)};
+        installEventLogger(${target === 'fd' ? 'require("node:fs").openSync(file, "w")' : 'file'});
+        events('origin')('parent');
+        const child = require('node:child_process').spawn(process.execPath,
+          ${JSON.stringify([...flags, '-e', childScript])}, { stdio: 'inherit' });
+        child.on('close', async code => {
+          await flushEventLogger();
+          process.exitCode = code;
+        });
+      `;
+      await promisify(execFile)(
+        process.execPath,
+        [...flags, '-e', parentScript],
+        {
+          env: {
+            ...process.env,
+            [INTERNAL_IPC_ENV]: '',
+            [INTERNAL_PROCESS_ORIGIN_ENV]: '',
+            [LOG_EVENTS_ENV]: '',
+          },
+          timeout: 5000,
+        }
+      );
+      const lines = (await fs.readFile(file, 'utf8'))
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      const child = lines.find(event => event._e === 'origin:child');
+      expect(child).toBeDefined();
+      expect(child._w).toBe(`event_log_child:${child.pid}`);
+      expect(
+        lines.find(event => event._e === 'origin:parent')
+      ).not.toHaveProperty('_w');
+      expect(lines.filter(event => event._e === 'root:init')).toEqual([
+        expect.not.objectContaining({ _w: expect.any(String) }),
+        expect.objectContaining({
+          _w: child._w,
+          processOrigin: { kind: 'event_log_child', id: String(child.pid) },
+        }),
+      ]);
+    }
+  );
+
   it.each([false, true])(
     'captures a subtree inside an instrumented parent (explicit env: %s)',
     async explicitEnv => {
