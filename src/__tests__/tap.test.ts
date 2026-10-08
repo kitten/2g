@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises';
+import { getEventListeners } from 'node:events';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   EVENT_LOG_FORMAT_VERSION,
@@ -17,6 +18,108 @@ import { parseEventLine, parseSince } from '../utils/eventFilter';
 import type { ParsedEvent } from '../types';
 
 describe('tap', () => {
+  it.each([
+    ['history', true, false],
+    ['buffered', true, false],
+    ['live', true, false],
+    ['live', true, true],
+    ['live', false, false],
+    ['waiting', true, false],
+    ['ended', true, false],
+  ] as const)(
+    'cleans up after stopping during %s (timers: %s, throw: %s)',
+    async (phase, timers, throws) => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-stop-'));
+      const socketPath =
+        process.platform === 'win32'
+          ? `\\\\.\\pipe\\event-log-stop-${process.pid}-${path.basename(dir)}`
+          : path.join(dir, 'cleanup.sock');
+      await fs.writeFile(
+        path.join(dir, SESSION_FILES.meta),
+        JSON.stringify({
+          formatVersion: EVENT_LOG_FORMAT_VERSION,
+          socket: process.platform === 'win32' ? socketPath : 'cleanup.sock',
+          maxSegments: 1,
+        })
+      );
+      const line = `${JSON.stringify({ _e: 'test:stop', _t: 1 })}\n`;
+      if (phase === 'history')
+        await fs.writeFile(path.join(dir, '0.jsonl'), line);
+      let client: net.Socket | undefined;
+      const server = net.createServer(socket => {
+        client = socket;
+        socket.resume();
+        socket.write(line);
+      });
+      await new Promise<void>(resolve => server.listen(socketPath, resolve));
+      const abort = new AbortController();
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const iterator = tap(dir, {
+        follow: true,
+        signal: abort.signal,
+        ...(timers ? { timeout: 60_000, idleTimeout: 60_000 } : {}),
+      })[Symbol.asyncIterator]();
+      try {
+        expect((await iterator.next()).value).toMatchObject({
+          _e: 'test:stop',
+        });
+        if (phase === 'live') {
+          const next = iterator.next();
+          client!.write(line);
+          expect((await next).value).toMatchObject({ _e: 'test:stop' });
+        }
+        if (phase === 'waiting' || phase === 'ended') {
+          const next = iterator.next();
+          if (phase === 'waiting') abort.abort();
+          else client!.end();
+          expect((await next).done).toBe(true);
+        } else if (throws) {
+          const error = new Error('consumer stopped');
+          await expect(iterator.throw!(error)).rejects.toBe(error);
+        } else {
+          await iterator.return!();
+        }
+        await vi.waitFor(() => expect(client?.destroyed).toBe(true), {
+          timeout: 300,
+        });
+        expect(vi.getTimerCount()).toBe(0);
+        expect(getEventListeners(abort.signal, 'abort')).toHaveLength(0);
+        expect(abort.signal.aborted).toBe(phase === 'waiting');
+      } finally {
+        abort.abort();
+        await iterator.return!();
+        client?.destroy();
+        await new Promise<void>(resolve => server.close(() => resolve()));
+        vi.useRealTimers();
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('cleans up timeouts when the caller signal is already aborted', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-aborted-'));
+    const abort = new AbortController();
+    abort.abort();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      expect(
+        await collect(
+          tap(dir, {
+            follow: true,
+            signal: abort.signal,
+            timeout: 60_000,
+            idleTimeout: 60_000,
+          })
+        )
+      ).toEqual([]);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(getEventListeners(abort.signal, 'abort')).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('discovers sessions, replays filtered history, follows live events, and preserves duplicates', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-tap-'));
     const restoreDir = setSessionDir(dir);
@@ -131,6 +234,8 @@ describe('tap', () => {
       ]);
       expect(next.done).toBe(false);
       expect(next.value).toMatchObject({ _e: 'test:live' });
+      await iterator.return!();
+      await vi.waitFor(() => expect(client?.destroyed).toBe(true));
     } finally {
       client?.destroy();
       server.close();
