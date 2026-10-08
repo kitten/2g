@@ -120,45 +120,48 @@ export async function* tap(
   const abort = createTapAbortController(options, follow);
   const signal = abort?.signal ?? options.signal;
   const meta = readMetaSync(sessionDir);
-  const live = follow ? await connectLive(sessionDir, meta, signal) : undefined;
-  const history = await openHistoryFiles(sessionDir, meta);
   let idleTimer: NodeJS.Timeout | undefined;
 
   try {
-    for (const handle of history) {
-      for await (const line of readLines(handle)) {
-        const event = parseEventLine(line, options, eventFilter, since);
-        if (event) yield event;
+    const live = follow
+      ? await connectLive(sessionDir, meta, signal)
+      : undefined;
+    const history = await openHistoryFiles(sessionDir, meta);
+    try {
+      for (const handle of history) {
+        for await (const line of readLines(handle)) {
+          const event = parseEventLine(line, options, eventFilter, since);
+          if (event) yield event;
+        }
+      }
+    } finally {
+      await Promise.all(history.map(handle => handle.close().catch(() => {})));
+    }
+
+    if (!live) return;
+    if (options.idleTimeout != null && abort) {
+      idleTimer = setAbortTimer(abort, options.idleTimeout);
+    }
+
+    for (const line of live.buffer.splice(0)) {
+      const event = parseEventLine(line, options, eventFilter, since);
+      if (event) {
+        idleTimer?.refresh();
+        yield event;
       }
     }
-  } finally {
-    await Promise.all(history.map(handle => handle.close().catch(() => {})));
-  }
 
-  if (!live) return;
-  if (options.idleTimeout != null && abort) {
-    idleTimer = setAbortTimer(abort, options.idleTimeout);
-  }
-
-  for (const line of live.buffer.splice(0)) {
-    const event = parseEventLine(line, options, eventFilter, since);
-    if (event) {
-      if (idleTimer)
-        idleTimer = resetAbortTimer(idleTimer, abort!, options.idleTimeout!);
-      yield event;
+    while (!signal?.aborted) {
+      const line = await live.next();
+      if (line == null || signal?.aborted) break;
+      idleTimer?.refresh();
+      const event = parseEventLine(line, options, eventFilter, since);
+      if (event) yield event;
     }
+  } finally {
+    clearTimeout(idleTimer);
+    abort?.abort();
   }
-
-  while (!signal?.aborted) {
-    const line = await readLiveLine(live, signal);
-    if (line == null) break;
-    if (idleTimer)
-      idleTimer = resetAbortTimer(idleTimer, abort!, options.idleTimeout!);
-    const event = parseEventLine(line, options, eventFilter, since);
-    if (event) yield event;
-  }
-
-  if (idleTimer) clearTimeout(idleTimer);
 }
 
 // Rotation discards the oldest segment once the ring fills, so a retained
@@ -263,16 +266,17 @@ async function connectLive(
     else if (line != null) buffer.push(line);
   };
 
+  const close = () => rl.close();
   rl.on('line', line => push(line));
   rl.on('close', () => {
     closed = true;
     push(null);
+    socket.destroy();
+    signal?.removeEventListener('abort', close);
   });
-  socket.on('error', () => {
-    closed = true;
-    push(null);
-  });
-  signal?.addEventListener('abort', () => socket.destroy(), { once: true });
+  socket.on('error', close);
+  signal?.addEventListener('abort', close, { once: true });
+  if (signal?.aborted) close();
 
   return {
     buffer,
@@ -284,48 +288,28 @@ async function connectLive(
   };
 }
 
-function readLiveLine(
-  live: { next(): Promise<string | null> },
-  signal?: AbortSignal
-) {
-  if (!signal) return live.next();
-  if (signal.aborted) return Promise.resolve(null);
-
-  return new Promise<string | null>(resolve => {
-    const onAbort = () => resolve(null);
-    signal.addEventListener('abort', onAbort, { once: true });
-    live.next().then(line => {
-      signal.removeEventListener('abort', onAbort);
-      resolve(signal.aborted ? null : line);
-    });
-  });
-}
-
 function createTapAbortController(options: TapOptions, follow: boolean) {
-  if (!follow || (options.timeout == null && options.idleTimeout == null))
-    return undefined;
+  if (!follow) return undefined;
 
   const abort = new AbortController();
-  options.signal?.addEventListener('abort', () => abort.abort(), {
-    once: true,
-  });
-  if (options.timeout != null) setAbortTimer(abort, options.timeout);
+  const timer =
+    options.timeout != null ? setAbortTimer(abort, options.timeout) : undefined;
+  const onAbort = () => abort.abort();
+  options.signal?.addEventListener('abort', onAbort, { once: true });
+  abort.signal.addEventListener(
+    'abort',
+    () => {
+      clearTimeout(timer);
+      options.signal?.removeEventListener('abort', onAbort);
+    },
+    { once: true }
+  );
+  if (options.signal?.aborted) abort.abort();
   return abort;
 }
 
-function resetAbortTimer(
-  timer: NodeJS.Timeout,
-  abort: AbortController,
-  timeout: number
-) {
-  clearTimeout(timer);
-  return setAbortTimer(abort, timeout);
-}
-
 function setAbortTimer(abort: AbortController, timeout: number) {
-  const timer = setTimeout(() => abort.abort(), timeout);
-  timer.unref?.();
-  return timer;
+  return setTimeout(() => abort.abort(), timeout).unref();
 }
 
 function matchesSessionExactly(session: ListedSession, selector: string) {
