@@ -45,8 +45,7 @@ export async function main(argv = process.argv.slice(2)) {
       runCleanCli(args);
       return 0;
     case 'record':
-      await runRecordCli(args);
-      return 0;
+      return runRecordCli(args);
     case 'export':
       await runExportCli(args);
       return 0;
