@@ -17,7 +17,7 @@ type ExportFormat = 'chrome-trace' | 'opentelemetry';
 export async function runRecordCli(args: string[]) {
   if (parseHelp(args)) {
     printRecordHelp();
-    return;
+    return 0;
   }
 
   // Everything after `--` is the command and its own arguments, verbatim
@@ -80,7 +80,7 @@ export async function runRecordCli(args: string[]) {
     if (options.output) fs.writeFileSync(options.output, `${output}\n`);
     else process.stdout.write(`${output}\n`);
 
-    if (exitCode) process.exitCode = exitCode;
+    return exitCode;
   } finally {
     process.off('SIGINT', onSignal);
     process.off('SIGTERM', onSignal);
