@@ -97,7 +97,7 @@ export class TraceConverter {
 
   add(event: ParsedEvent) {
     if (event._e === 'root:init') {
-      if (typeof event.version === 'string') {
+      if (!event._w && typeof event.version === 'string') {
         this.#version = event.version;
         if (this.#processName === '2g') {
           this.#processName = `2g (v${event.version})`;

@@ -82,10 +82,12 @@ class OpenTelemetryConverter {
 
   add(event: ParsedEvent) {
     const eventTime = unixNano(event._t);
+    const startTime =
+      typeof event._d === 'number' ? unixNano(event._t - event._d) : eventTime;
     this.#startTimeUnixNano =
       this.#startTimeUnixNano == null ||
-      BigInt(eventTime) < BigInt(this.#startTimeUnixNano)
-        ? eventTime
+      BigInt(startTime) < BigInt(this.#startTimeUnixNano)
+        ? startTime
         : this.#startTimeUnixNano;
     this.#endTimeUnixNano =
       this.#endTimeUnixNano == null ||
@@ -94,9 +96,11 @@ class OpenTelemetryConverter {
         : this.#endTimeUnixNano;
 
     if (event._e === 'root:init') {
-      if (typeof event.version === 'string') this.#version = event.version;
-      if (this.#processName === '2g' && typeof event.version === 'string') {
-        this.#processName = `2g (v${event.version})`;
+      if (!event._w && typeof event.version === 'string') {
+        this.#version = event.version;
+        if (this.#processName === '2g') {
+          this.#processName = `2g (v${event.version})`;
+        }
       }
       return;
     }

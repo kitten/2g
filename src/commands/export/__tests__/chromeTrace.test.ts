@@ -130,10 +130,23 @@ describe('trace', () => {
 
   it('emits a single process_name carrying the version-derived name', async () => {
     const trace = await convertToChromeTrace([
+      {
+        _e: 'root:init',
+        _t: 950,
+        _w: 'worker_thread:1',
+        version: 'UNVERSIONED',
+      },
       { _e: 'root:init', _t: 900, version: '1.0.0' },
+      {
+        _e: 'root:init',
+        _t: 975,
+        _w: 'event_log_child:2',
+        version: 'UNVERSIONED',
+      },
       { _e: 'env:mode', _t: 1000 },
     ]);
 
+    expect(trace.metadata.version).toBe('1.0.0');
     const processNames = trace.traceEvents.filter(
       event => event.ph === 'M' && event.name === 'process_name'
     );
