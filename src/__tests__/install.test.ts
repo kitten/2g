@@ -290,12 +290,26 @@ describe('install session', () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
     const restoreDir = setSessionDir(dir);
     const restoreDebug = setEnv(LOG_DEBUG_ENV, 'metro:*');
+    const restoreEvents = setEnv(LOG_EVENTS_ENV, 'unused.jsonl');
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const restoreDebugIpc = setEnv(INTERNAL_DEBUG_ENV, undefined);
+    const restoreOrigin = setEnv(INTERNAL_PROCESS_ORIGIN_ENV, undefined);
+    const previousDebug = eventLogState.debug;
+    eventLogState.debug = true;
     const write = vi
       .spyOn(process.stderr, 'write')
       .mockImplementation(() => true);
     const session = createSession({ command: 'debug' });
 
     try {
+      const ipcPath = process.env[INTERNAL_IPC_ENV];
+      expect(ipcPath).toBeTruthy();
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBe('1');
+      expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBe(
+        String(process.pid)
+      );
+      expect(process.env[LOG_EVENTS_ENV]).toBeUndefined();
+      expect(process.env[LOG_DEBUG_ENV]).toBeUndefined();
       session.sink._writeln(
         `${JSON.stringify({ _e: 'metro:done', _t: Date.now(), _d: 1534 })}\n`
       );
@@ -319,10 +333,29 @@ describe('install session', () => {
       expect(output).toContain('"_w":"worker_thread:1"');
       expect(output).toContain('"file":"App.tsx"');
       expect(output).not.toContain('env:info');
+
+      session.sink.destroy();
+      expect(process.env[INTERNAL_IPC_ENV]).toBe(ipcPath);
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBe('1');
+      expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBe(
+        String(process.pid)
+      );
+
+      session.destroy();
+      expect(process.env[INTERNAL_IPC_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBeUndefined();
+      expect(process.env[LOG_EVENTS_ENV]).toBeUndefined();
+      expect(process.env[LOG_DEBUG_ENV]).toBeUndefined();
     } finally {
       write.mockRestore();
       session.destroy();
+      eventLogState.debug = previousDebug;
       restoreDebug();
+      restoreEvents();
+      restoreIpc();
+      restoreDebugIpc();
+      restoreOrigin();
       restoreDir();
       await fs.rm(dir, { recursive: true, force: true });
     }
@@ -558,6 +591,8 @@ describe('install explicit file target', () => {
       });
       _resetEventLogState();
       expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_IPC_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBeUndefined();
       expect(getProcessOrigin()).toBeNull();
     } finally {
       childStream?.destroy();

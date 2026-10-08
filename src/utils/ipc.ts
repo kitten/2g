@@ -30,18 +30,8 @@ export function isParentDebugEnabled() {
   return process.env[INTERNAL_DEBUG_ENV] === '1';
 }
 
-function publishIpcPath(socketPath: string) {
+export function publishChildEnv(socketPath: string) {
   process.env[INTERNAL_IPC_ENV] = socketPath;
-  return () => {
-    if (process.env[INTERNAL_IPC_ENV] === socketPath)
-      delete process.env[INTERNAL_IPC_ENV];
-  };
-}
-
-export function listenIpcSink(sink: EventSink, socketPath: string) {
-  const server = net.createServer(socket => ingestIpcSocket(socket, sink));
-  const closeServer = listenSocket(server, socketPath);
-  const restoreIpcPath = publishIpcPath(socketPath);
   const isDebug = eventLogState.debug;
   if (isDebug) {
     process.env[INTERNAL_DEBUG_ENV] = '1';
@@ -52,8 +42,8 @@ export function listenIpcSink(sink: EventSink, socketPath: string) {
   const restoreProcessOrigin = publishProcessOrigin();
 
   return () => {
-    closeServer();
-    restoreIpcPath();
+    if (process.env[INTERNAL_IPC_ENV] === socketPath)
+      delete process.env[INTERNAL_IPC_ENV];
     if (isDebug) {
       delete process.env[INTERNAL_DEBUG_ENV];
     }
@@ -72,13 +62,18 @@ function createTempIpcPath() {
 
 export function publishTempIpcSink(sink: LogStream) {
   const socketPath = createTempIpcPath();
-  const closeIpc = listenIpcSink(sink, socketPath);
+  const closeIpc = listenSocket(
+    net.createServer(socket => ingestIpcSocket(socket, sink)),
+    socketPath
+  );
+  const clearChildEnvironment = publishChildEnv(socketPath);
   let cleanedUp = false;
 
   const cleanup = () => {
     if (cleanedUp) return;
     cleanedUp = true;
     closeIpc();
+    clearChildEnvironment();
     removeSocket(socketPath);
   };
 

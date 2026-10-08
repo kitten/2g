@@ -15,7 +15,7 @@ import { createDebugSink } from './debug';
 import { eventLogState } from './state';
 import { BroadcastChannel } from './utils/broadcastChannel';
 import { LogStream, type EventSink } from './utils/logStream';
-import { listenIpcSink } from './utils/ipc';
+import { ingestIpcSocket, publishChildEnv } from './utils/ipc';
 import { registerProcessCleanup } from './utils/processExit';
 import {
   createSocketAddress,
@@ -93,7 +93,11 @@ export function createSession(options: SessionOptions): SessionContext {
 
   const liveServer = net.createServer(socket => sink.attach(socket));
   const closeLiveServer = listenSocket(liveServer, liveSocket.path);
-  const closeIpcServer = listenIpcSink(sink, ipcSocket.path);
+  const closeIpcServer = listenSocket(
+    net.createServer(socket => ingestIpcSocket(socket, sink)),
+    ipcSocket.path
+  );
+  const clearChildEnvironment = publishChildEnv(ipcSocket.path);
 
   const meta: SessionMeta = {
     pid: process.pid,
@@ -119,6 +123,7 @@ export function createSession(options: SessionOptions): SessionContext {
     sink.destroy();
     closeLiveServer();
     closeIpcServer();
+    clearChildEnvironment();
     // rmSync can throw EPERM/EBUSY and must not skip the restoration above
     removeSocket(liveSocket.path);
     removeSocket(ipcSocket.path);
