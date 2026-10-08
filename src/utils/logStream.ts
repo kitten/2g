@@ -6,6 +6,7 @@ import path from 'node:path';
 const BUSY_WRITE_TIMEOUT = 100;
 const HIGH_WATER_MARK = 16_384;
 const WRITE_BATCH_SIZE = 65_536;
+const EMPTY_BUFFER = Buffer.alloc(0);
 
 export interface EventSink {
   readonly writable: boolean;
@@ -22,7 +23,7 @@ export interface LogStreamOptions {
 }
 
 export type LogStreamDrain = (
-  data: string | Buffer,
+  data: Buffer,
   cb: (error?: Error | null) => void
 ) => void;
 
@@ -52,7 +53,7 @@ export class LogStream
   #opening = false;
   #reopening = false;
 
-  #output: string | Buffer = '';
+  #output: Buffer = EMPTY_BUFFER;
   #len = 0;
   #lines: string[] = [];
   #head = 0;
@@ -70,7 +71,7 @@ export class LogStream
     if (error != null) {
       this.#fail(error as NodeJS.ErrnoException);
     } else {
-      this.#release(null, Buffer.byteLength(this.#output));
+      this.#release(null, this.#output.length);
     }
   };
 
@@ -79,7 +80,8 @@ export class LogStream
     if (
       !this.#writing &&
       !this.#destroyed &&
-      (this.#lines.length - this.#head > this.#partialLine || this.#output)
+      (this.#lines.length - this.#head > this.#partialLine ||
+        this.#output.length)
     ) {
       this.#writeLine();
     }
@@ -117,7 +119,7 @@ export class LogStream
   }
 
   get buffered(): number {
-    return this.#len;
+    return this.#len + this.#output.length;
   }
 
   get writable(): boolean {
@@ -170,17 +172,13 @@ export class LogStream
     this.#busyRetries = 0;
     this.emit('write', written);
 
-    this.#len -= this.#output.length;
-    if (written < Buffer.byteLength(this.#output)) {
-      if (typeof this.#output === 'string')
-        this.#output = Buffer.from(this.#output);
+    if (written < this.#output.length) {
       this.#output = this.#output.subarray(written);
-      this.#len += this.#output.length;
     } else {
-      this.#output = '';
+      this.#output = EMPTY_BUFFER;
     }
 
-    if (this.#output) {
+    if (this.#output.length) {
       this.#writeLine();
     } else if (this.#closing && !this.#ending) {
       this.#writing = false;
@@ -309,14 +307,16 @@ export class LogStream
 
   #writeLine() {
     this.#writing = true;
-    if (!this.#output) {
+    if (!this.#output.length) {
       const end = this.#lines.length - this.#partialLine;
       if (end > this.#head) {
-        this.#output = this.#lines[this.#head++] || '';
+        let output = this.#lines[this.#head++] || '';
         // Batch accumulated lines into one write to avoid per-line syscalls
-        while (this.#head < end && this.#output.length < WRITE_BATCH_SIZE) {
-          this.#output += this.#lines[this.#head++];
+        while (this.#head < end && output.length < WRITE_BATCH_SIZE) {
+          output += this.#lines[this.#head++];
         }
+        this.#len -= output.length;
+        this.#output = Buffer.from(output);
         if (this.#head === this.#lines.length) {
           this.#lines.length = 0;
           this.#head = 0;
@@ -327,7 +327,7 @@ export class LogStream
     if (this.#drain != null && (this.#draining || this.#fd < 0)) {
       this.#drain(this.#output, this.#onDrained);
     } else {
-      fs.write(this.#fd, this.#output as string, this.#onRelease);
+      fs.write(this.#fd, this.#output, this.#onRelease);
     }
   }
 
@@ -416,7 +416,7 @@ export class LogStream
       if (!this.#writing) {
         if (
           this.#lines.length - this.#head > this.#partialLine ||
-          this.#output
+          this.#output.length
         ) {
           this.#writeLine();
         } else {
@@ -431,7 +431,7 @@ export class LogStream
     this.#len += data.length;
     this.#lines.push(data);
     if (!this.#writing) this.#scheduleWrite();
-    return this.#len < HIGH_WATER_MARK;
+    return this.buffered < HIGH_WATER_MARK;
   }
 
   _write(data: string): boolean {
@@ -475,7 +475,7 @@ export class LogStream
       this.#scheduleWrite();
     }
 
-    return this.#len < HIGH_WATER_MARK;
+    return this.buffered < HIGH_WATER_MARK;
   }
 
   write(
