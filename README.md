@@ -143,6 +143,12 @@ are rejected in payload types, and payloads with no required keys become optiona
 arguments. `2g typegen` merges the registry declarations of a whole project into
 one schema.
 
+Categories and event names must be nonempty ASCII identifiers using only letters,
+digits, `_`, `-`, `.`, and `:`. TypeScript checks literals; `typegen` checks registered
+names. Dynamic strings, JavaScript callers, and type assertions must follow the
+same convention: logging does not validate or escape names at runtime. Put dynamic
+text in payloads.
+
 ## CLI
 
 Use the CLI to find sessions, replay logs, or export traces:
