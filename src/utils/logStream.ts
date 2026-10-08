@@ -22,7 +22,7 @@ export interface LogStreamOptions {
 }
 
 export type LogStreamDrain = (
-  data: string,
+  data: Buffer,
   cb: (error?: Error | null) => void
 ) => void;
 
@@ -52,7 +52,9 @@ export class LogStream
   #opening = false;
   #reopening = false;
 
-  #output = '';
+  #output: Buffer = Buffer.allocUnsafe(0);
+  #offset = 0;
+  #size = 0;
   #len = 0;
   #lines: string[] = [];
   #head = 0;
@@ -62,25 +64,14 @@ export class LogStream
   #scheduled = false;
   #drain?: LogStreamDrain;
 
-  #onRelease = (err: NodeJS.ErrnoException | null, written: number) => {
-    this.#release(err, written);
-  };
-
-  #onDrained = (error?: Error | null) => {
-    if (error != null) {
-      this.#fail(error as NodeJS.ErrnoException);
-    } else {
-      this.#release(null, Buffer.byteLength(this.#output));
-    }
-  };
+  #onDrained = (error?: Error | null) =>
+    error
+      ? this.#fail(error as NodeJS.ErrnoException)
+      : this.#release(null, this.#size);
 
   #onScheduledWrite = () => {
     this.#scheduled = false;
-    if (
-      !this.#writing &&
-      !this.#destroyed &&
-      (this.#lines.length - this.#head > this.#partialLine || this.#output)
-    ) {
+    if (!this.#writing && this.#lines.length - this.#head > this.#partialLine) {
       this.#writeLine();
     }
   };
@@ -117,7 +108,7 @@ export class LogStream
   }
 
   get buffered(): number {
-    return this.#len;
+    return this.#len + this.#size;
   }
 
   get writable(): boolean {
@@ -147,7 +138,7 @@ export class LogStream
   #retryLine(error: NodeJS.ErrnoException) {
     if (error.code === 'EAGAIN' && this.#drain != null) {
       this.#draining = true;
-      this.#drain(this.#output, this.#onDrained);
+      this.#writeLine();
     } else if (this.#busyRetries === 0) {
       this.#busyRetries = 1;
       setImmediate(() => this.#writeLine());
@@ -157,7 +148,7 @@ export class LogStream
     }
   }
 
-  #release(error: NodeJS.ErrnoException | null, written: number) {
+  #release = (error: NodeJS.ErrnoException | null, written: number) => {
     if (error) {
       if (error.code === 'EAGAIN' || error.code === 'EBUSY') {
         this.#retryLine(error);
@@ -170,44 +161,28 @@ export class LogStream
     this.#busyRetries = 0;
     this.emit('write', written);
 
-    if (written === this.#output.length) {
-      // Complete write; exact for ASCII, the common case for JSONL
-      this.#len -= this.#output.length;
-      this.#output = '';
-    } else {
-      const outputLength = Buffer.byteLength(this.#output);
-      if (outputLength > written) {
-        const output = Buffer.from(this.#output).toString('utf8', written);
-        this.#len -= this.#output.length - output.length;
-        this.#output = output;
-      } else {
-        this.#len -= this.#output.length;
-        this.#output = '';
-      }
-    }
+    this.#offset += written;
+    this.#size -= written;
+    this.#writing = false;
 
-    if (this.#output) {
+    if (this.#size) {
       this.#writeLine();
     } else if (this.#closing && !this.#ending) {
-      this.#writing = false;
       this.#close();
     } else if (this.#reopening) {
       // Rotation has already renamed the file; switch fds before the next batch.
-      this.#writing = false;
       this.#reopen();
     } else if (this.#lines.length - this.#head > this.#partialLine) {
       this.#writeLine();
     } else if (this.#ending) {
-      this.#writing = false;
       this.#close();
     } else {
-      this.#writing = false;
       this.#draining = false;
       if (this.#flushPending) {
         this.emit('drain');
       }
     }
-  }
+  };
 
   #openFile(file: string) {
     this.#open(onOpened => {
@@ -315,14 +290,19 @@ export class LogStream
 
   #writeLine() {
     this.#writing = true;
-    if (!this.#output) {
+    if (!this.#size) {
       const end = this.#lines.length - this.#partialLine;
       if (end > this.#head) {
-        this.#output = this.#lines[this.#head++] || '';
+        let output = this.#lines[this.#head++];
         // Batch accumulated lines into one write to avoid per-line syscalls
-        while (this.#head < end && this.#output.length < WRITE_BATCH_SIZE) {
-          this.#output += this.#lines[this.#head++];
+        while (this.#head < end && output.length < WRITE_BATCH_SIZE) {
+          output += this.#lines[this.#head++];
         }
+        this.#len -= output.length;
+        if (this.#output.length < output.length * 3)
+          this.#output = Buffer.allocUnsafe(output.length * 3);
+        this.#offset = 0;
+        this.#size = this.#output.write(output);
         if (this.#head === this.#lines.length) {
           this.#lines.length = 0;
           this.#head = 0;
@@ -331,9 +311,19 @@ export class LogStream
     }
     // A deep queue under backpressure stays writability-paced until it empties
     if (this.#drain != null && (this.#draining || this.#fd < 0)) {
-      this.#drain(this.#output, this.#onDrained);
+      this.#drain(
+        this.#output.subarray(this.#offset, this.#offset + this.#size),
+        this.#onDrained
+      );
     } else {
-      fs.write(this.#fd, this.#output, this.#onRelease);
+      fs.write(
+        this.#fd,
+        this.#output,
+        this.#offset,
+        this.#size,
+        null,
+        this.#release
+      );
     }
   }
 
@@ -420,10 +410,7 @@ export class LogStream
       this.once('error', onError);
 
       if (!this.#writing) {
-        if (
-          this.#lines.length - this.#head > this.#partialLine ||
-          this.#output
-        ) {
+        if (this.#lines.length - this.#head > this.#partialLine) {
           this.#writeLine();
         } else {
           process.nextTick(() => this.emit('drain'));
@@ -437,7 +424,7 @@ export class LogStream
     this.#len += data.length;
     this.#lines.push(data);
     if (!this.#writing) this.#scheduleWrite();
-    return this.#len < HIGH_WATER_MARK;
+    return this.buffered < HIGH_WATER_MARK;
   }
 
   _write(data: string): boolean {
@@ -481,7 +468,7 @@ export class LogStream
       this.#scheduleWrite();
     }
 
-    return this.#len < HIGH_WATER_MARK;
+    return this.buffered < HIGH_WATER_MARK;
   }
 
   write(

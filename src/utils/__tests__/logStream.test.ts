@@ -1,13 +1,136 @@
-import { renameSync } from 'node:fs';
+import syncFs, { renameSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { LogStream } from '../logStream';
+import { LogStream, type LogStreamDrain } from '../logStream';
 
 describe('logStream', () => {
+  it.each([
+    ['split two-byte character', 'é\n', 1],
+    ['byte count equals string length', 'é\n', 2],
+    ['split three-byte character', '漢\n', 1],
+    ['split surrogate pair', '😀\n', 1],
+    ['mixed JSONL', '{"message":"café 漢字 😀"}\n', 3],
+    ['ASCII', 'plain text\n', 3],
+  ] as const)(
+    'preserves bytes through partial writes: %s',
+    async (_, line, limit) => {
+      const dir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'event-log-unicode-')
+      );
+      const file = path.join(dir, 'events.jsonl');
+      const stream = new LogStream(file);
+      await once(stream, 'ready');
+      const write = vi.spyOn(syncFs, 'write').mockImplementation(((
+        fd: number,
+        data: Buffer,
+        offset: number,
+        length: number,
+        _position: null,
+        cb: (error: null, written: number) => void
+      ) => {
+        const written = syncFs.writeSync(
+          fd,
+          data,
+          offset,
+          write.mock.calls.length <= 3 ? Math.min(length, limit) : length
+        );
+        setImmediate(() => cb(null, written));
+      }) as typeof syncFs.write);
+
+      try {
+        stream._writeln(line);
+        await flush(stream);
+        expect(await fs.readFile(file)).toEqual(Buffer.from(line));
+        expect(stream.buffered).toBe(0);
+        stream._writeln('next\n');
+        await flush(stream);
+        expect(await fs.readFile(file)).toEqual(Buffer.from(`${line}next\n`));
+        expect(stream.buffered).toBe(0);
+      } finally {
+        write.mockRestore();
+        stream.destroy();
+        await once(stream, 'close');
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('preserves a partial UTF-8 tail when backpressure switches to socket draining', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-unicode-'));
+    const file = path.join(dir, 'events.jsonl');
+    const handle = await fs.open(file, 'w+');
+    const drain = vi.fn<LogStreamDrain>((data, cb) => {
+      syncFs.writeSync(handle.fd, Buffer.from(data));
+      setImmediate(() => cb());
+    });
+    const stream = new LogStream(
+      onOpened => setImmediate(() => onOpened(null, handle.fd, drain)),
+      { closeFd: false }
+    );
+    await once(stream, 'ready');
+    const write = vi.spyOn(syncFs, 'write').mockImplementation(((
+      fd: number,
+      data: Buffer,
+      offset: number,
+      length: number,
+      _position: null,
+      cb: (error: NodeJS.ErrnoException | null, written: number) => void
+    ) => {
+      if (write.mock.calls.length === 1) {
+        const written = syncFs.writeSync(fd, data, offset, Math.min(length, 1));
+        setImmediate(() => cb(null, written));
+      } else {
+        setImmediate(() =>
+          cb(Object.assign(new Error('busy'), { code: 'EAGAIN' }), 0)
+        );
+      }
+    }) as typeof syncFs.write);
+
+    try {
+      stream._writeln('😀\n');
+      await flush(stream);
+      expect(drain).toHaveBeenCalledTimes(1);
+      expect(drain.mock.calls[0][0]).toEqual(Buffer.from('😀\n').subarray(1));
+      expect(await fs.readFile(file)).toEqual(Buffer.from('😀\n'));
+      expect(stream.buffered).toBe(0);
+    } finally {
+      write.mockRestore();
+      stream.destroy();
+      await once(stream, 'close');
+      await handle.close();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('writes only the active bytes when reusing and growing the batch buffer', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-unicode-'));
+    const file = path.join(dir, 'events.jsonl');
+    const stream = new LogStream(file);
+    const lines = [
+      `${'漢'.repeat(65_536)}\n`,
+      'ascii\n',
+      `${'😀'.repeat(90_000)}\n`,
+      'é\n',
+    ];
+
+    try {
+      for (const line of lines) {
+        stream._writeln(line);
+        await flush(stream);
+        expect(stream.buffered).toBe(0);
+      }
+      expect(await fs.readFile(file)).toEqual(Buffer.from(lines.join('')));
+    } finally {
+      stream.destroy();
+      await once(stream, 'close');
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('reopens after the current batch before draining queued batches', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-stream-'));
     const file = path.join(dir, '0.jsonl');
