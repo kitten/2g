@@ -290,12 +290,26 @@ describe('install session', () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
     const restoreDir = setSessionDir(dir);
     const restoreDebug = setEnv(LOG_DEBUG_ENV, 'metro:*');
+    const restoreEvents = setEnv(LOG_EVENTS_ENV, 'unused.jsonl');
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const restoreDebugIpc = setEnv(INTERNAL_DEBUG_ENV, undefined);
+    const restoreOrigin = setEnv(INTERNAL_PROCESS_ORIGIN_ENV, undefined);
+    const previousDebug = eventLogState.debug;
+    eventLogState.debug = true;
     const write = vi
       .spyOn(process.stderr, 'write')
       .mockImplementation(() => true);
     const session = createSession({ command: 'debug' });
 
     try {
+      const ipcPath = process.env[INTERNAL_IPC_ENV];
+      expect(ipcPath).toBeTruthy();
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBe('1');
+      expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBe(
+        String(process.pid)
+      );
+      expect(process.env[LOG_EVENTS_ENV]).toBeUndefined();
+      expect(process.env[LOG_DEBUG_ENV]).toBeUndefined();
       session.sink._writeln(
         `${JSON.stringify({ _e: 'metro:done', _t: Date.now(), _d: 1534 })}\n`
       );
@@ -319,10 +333,29 @@ describe('install session', () => {
       expect(output).toContain('"_w":"worker_thread:1"');
       expect(output).toContain('"file":"App.tsx"');
       expect(output).not.toContain('env:info');
+
+      session.sink.destroy();
+      expect(process.env[INTERNAL_IPC_ENV]).toBe(ipcPath);
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBe('1');
+      expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBe(
+        String(process.pid)
+      );
+
+      session.destroy();
+      expect(process.env[INTERNAL_IPC_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBeUndefined();
+      expect(process.env[LOG_EVENTS_ENV]).toBeUndefined();
+      expect(process.env[LOG_DEBUG_ENV]).toBeUndefined();
     } finally {
       write.mockRestore();
       session.destroy();
+      eventLogState.debug = previousDebug;
       restoreDebug();
+      restoreEvents();
+      restoreIpc();
+      restoreDebugIpc();
+      restoreOrigin();
       restoreDir();
       await fs.rm(dir, { recursive: true, force: true });
     }
@@ -330,6 +363,45 @@ describe('install session', () => {
 });
 
 describe('install explicit file target', () => {
+  it.each([false, true])(
+    'handles an unavailable working directory (fallback target: %s)',
+    async fallback => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-cwd-'));
+      const file = path.join(dir, 'events.jsonl');
+      const restoreEvents = setEnv(LOG_EVENTS_ENV, 'events.jsonl');
+      const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+
+      try {
+        vi.resetModules();
+        const { installEventLogger, getEventLoggerInfo, flushEventLogger } =
+          await import('../install');
+        const cwd = vi.spyOn(process, 'cwd').mockImplementation(() => {
+          throw Object.assign(new Error('cwd unavailable'), { code: 'ENOENT' });
+        });
+        try {
+          installEventLogger(fallback ? file : undefined);
+        } finally {
+          cwd.mockRestore();
+        }
+        if (fallback) {
+          expect(getEventLoggerInfo()).toMatchObject({
+            destination: 'file',
+            file,
+          });
+          await flushEventLogger();
+          expect(await fs.readFile(file, 'utf8')).toContain('"root:init"');
+        } else {
+          expect(getEventLoggerInfo()).toBeNull();
+        }
+      } finally {
+        _resetEventLogState();
+        restoreEvents();
+        restoreIpc();
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it.each([
     ['file', '1.2.3'],
     ['fd', '1.2.3'],
@@ -519,6 +591,8 @@ describe('install explicit file target', () => {
       });
       _resetEventLogState();
       expect(process.env[INTERNAL_PROCESS_ORIGIN_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_IPC_ENV]).toBeUndefined();
+      expect(process.env[INTERNAL_DEBUG_ENV]).toBeUndefined();
       expect(getProcessOrigin()).toBeNull();
     } finally {
       childStream?.destroy();

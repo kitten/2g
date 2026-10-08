@@ -6,6 +6,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { BroadcastChannel } from '../broadcastChannel';
+import { ingestIpcSocket } from '../ipc';
 import type { EventSink } from '../logStream';
 
 describe('BroadcastChannel', () => {
@@ -29,7 +30,7 @@ describe('BroadcastChannel', () => {
       destroy() {},
     };
     const channel = new BroadcastChannel(primary);
-    const server = net.createServer(socket => channel.ingest(socket));
+    const server = net.createServer(socket => ingestIpcSocket(socket, channel));
 
     try {
       await new Promise<void>(resolve => server.listen(socketPath, resolve));
