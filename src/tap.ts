@@ -4,13 +4,13 @@ import net from 'node:net';
 import { createInterface } from 'node:readline';
 
 import { DEFAULT_SEGMENTS, SESSION_FILES } from './constants';
+import { cleanStaleSessionsSync } from './clean';
 import {
-  cleanStaleSessionsSync,
   getSessionBaseDir,
   isPidAlive,
   newestSessionIds,
   readMetaSync,
-} from './clean';
+} from './discovery';
 import { type SessionMeta } from './session';
 import type { ParsedEvent } from './types';
 import {

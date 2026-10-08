@@ -13,7 +13,7 @@ import {
   LOG_EVENTS_ENV,
   SESSION_FILES,
 } from '../constants';
-import { _setSessionBaseDir } from '../clean';
+import { _setSessionBaseDir } from '../discovery';
 import { _resetEventLogState, eventLogState } from '../state';
 
 describe('api', () => {

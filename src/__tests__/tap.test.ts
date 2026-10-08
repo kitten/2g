@@ -11,7 +11,7 @@ import {
   INTERNAL_IPC_ENV,
   SESSION_FILES,
 } from '../constants';
-import { _setSessionBaseDir } from '../clean';
+import { _setSessionBaseDir } from '../discovery';
 import { createSession } from '../session';
 import { detectRotationLoss, listSessions, resolveSession, tap } from '../tap';
 import { parseEventLine, parseSince } from '../utils/eventFilter';

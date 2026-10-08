@@ -4,12 +4,8 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  _setSessionBaseDir,
-  cleanExitedSessionsSync,
-  cleanStaleSessionsSync,
-  readMetaSync,
-} from '../clean';
+import { cleanExitedSessionsSync, cleanStaleSessionsSync } from '../clean';
+import { _setSessionBaseDir, readMetaSync } from '../discovery';
 import { resolveSocketPath } from '../utils/sessionSockets';
 import {
   DEFAULT_MAX_SESSIONS,
