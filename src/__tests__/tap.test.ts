@@ -33,11 +33,12 @@ describe('tap', () => {
       const socketPath =
         process.platform === 'win32'
           ? `\\\\.\\pipe\\event-log-stop-${process.pid}-${path.basename(dir)}`
-          : path.join(dir, 'live.sock');
+          : path.join(dir, 'cleanup.sock');
       await fs.writeFile(
         path.join(dir, SESSION_FILES.meta),
         JSON.stringify({
-          socket: process.platform === 'win32' ? socketPath : 'live.sock',
+          formatVersion: EVENT_LOG_FORMAT_VERSION,
+          socket: process.platform === 'win32' ? socketPath : 'cleanup.sock',
           maxSegments: 1,
         })
       );
