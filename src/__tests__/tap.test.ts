@@ -13,7 +13,8 @@ import {
 } from '../constants';
 import { _setSessionBaseDir } from '../discovery';
 import { createSession } from '../session';
-import { detectRotationLoss, listSessions, resolveSession, tap } from '../tap';
+import { detectRotationLoss, tap } from '../tap';
+import { listSessions, resolveSession } from '../sessions';
 import { parseEventLine, parseSince } from '../utils/eventFilter';
 import type { ParsedEvent } from '../types';
 

@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 
-import { resolveSession, tap } from '../../tap';
+import { resolveSession } from '../../sessions';
+import { tap } from '../../tap';
 import { redirectConsoleToStderr } from '../../utils/redirectConsole';
 import { formatPrettyEvent, shouldColorizeStream } from '../../utils/pretty';
 import {

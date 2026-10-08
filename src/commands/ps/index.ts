@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 
-import { listSessions } from '../../tap';
+import { listSessions } from '../../sessions';
 import { redirectConsoleToStderr } from '../../utils/redirectConsole';
 
 export async function runPsCli(args: string[] = []) {

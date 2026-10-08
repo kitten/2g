@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import { parseArgs } from 'node:util';
 
-import { resolveSession, tap } from '../../tap';
+import { resolveSession } from '../../sessions';
+import { tap } from '../../tap';
 import type { ParsedEvent } from '../../types';
 import { redirectConsoleToStderr } from '../../utils/redirectConsole';
 import {

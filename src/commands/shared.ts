@@ -3,7 +3,8 @@ import { createInterface } from 'node:readline';
 import type { Readable } from 'node:stream';
 import { parseArgs } from 'node:util';
 
-import { detectRotationLoss, type ListedSession } from '../tap';
+import { detectRotationLoss } from '../tap';
+import type { ListedSession } from '../sessions';
 import {
   compileEventFilter,
   matchesTapOptions,

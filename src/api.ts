@@ -1,11 +1,11 @@
+export { tap, type TapOptions } from './tap';
+
 export {
   listSessions as list,
   resolveSession,
-  tap,
   type ListedSession,
   type ListSessionsOptions,
-  type TapOptions,
-} from './tap';
+} from './sessions';
 
 export {
   captureEvents,
