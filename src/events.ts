@@ -4,7 +4,12 @@ import { performance } from 'node:perf_hooks';
 import { EVENT_LEVEL_DEBUG } from './constants';
 import { eventLogState } from './state';
 import { writeCompleteEvent, writeEvent } from './utils/serializeEvent';
-import type { EventLogger, SerializedError, SpanEnd } from './types';
+import type {
+  EventLogger,
+  SerializedError,
+  SpanEnd,
+  ValidEventName,
+} from './types';
 
 const NOOP_DONE: SpanEnd<any> = () => {};
 
@@ -89,13 +94,13 @@ function createEventLogger<const Category extends string>(
 }
 
 export function events<const Category extends string>(
-  category: Category
+  category: Category & ValidEventName<Category>
 ): EventLogger<Category> {
-  return createEventLogger(category, undefined);
+  return createEventLogger<Category>(category, undefined);
 }
 
 events.debug = function debug<const Category extends string>(
-  category: Category
+  category: Category & ValidEventName<Category>
 ): EventLogger<Category> {
-  return createEventLogger(category, EVENT_LEVEL_DEBUG);
+  return createEventLogger<Category>(category, EVENT_LEVEL_DEBUG);
 };
