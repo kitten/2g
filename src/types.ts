@@ -1,6 +1,26 @@
 type Prettify<T> =
   T extends Record<string, unknown> ? { [K in keyof T]: T[K] } : T;
 
+type Letters<S extends string> = S extends `${infer First}${infer Rest}`
+  ? First | Letters<Rest>
+  : never;
+type NameCharacter =
+  | Letters<'abcdefghijklmnopqrstuvwxyz0123456789_.:-'>
+  | Uppercase<Letters<'abcdefghijklmnopqrstuvwxyz'>>;
+type SafeCharacters<S extends string> = string extends S
+  ? true
+  : S extends ''
+    ? true
+    : S extends `${NameCharacter}${infer Rest}`
+      ? SafeCharacters<Rest>
+      : false;
+
+export type ValidEventName<Name extends string> = Name extends ''
+  ? never
+  : SafeCharacters<Name> extends true
+    ? Name
+    : never;
+
 type ReservedPayloadKeys = '_e' | '_t' | '_d' | '_l' | '_w';
 
 type ValidPayload<Payload> =
@@ -58,7 +78,7 @@ type PayloadArgs<Payload> = [Payload] extends [never]
 
 export interface SpanEnd<Category extends string> {
   <Name extends EventNamesFor<Category>>(
-    event: Name,
+    event: Name & ValidEventName<Name>,
     ...args: PayloadArgs<EventPayload<Category, Name>>
   ): void;
 }
@@ -73,7 +93,7 @@ export interface SerializedError {
 
 export interface EventLogger<Category extends string> {
   <Name extends EventNamesFor<Category>>(
-    event: Name,
+    event: Name & ValidEventName<Name>,
     ...args: PayloadArgs<EventPayload<Category, Name>>
   ): void;
   span(): SpanEnd<Category>;

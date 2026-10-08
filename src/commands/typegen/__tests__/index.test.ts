@@ -64,6 +64,20 @@ describe('typegen', () => {
           format: 'dts',
         })
       ).toContain('label?: string | undefined;');
+      await fs.writeFile(
+        path.join(dir, 'events.ts'),
+        `import '2g'; declare module '2g' {
+          interface EventRegistry { ${JSON.stringify('test:say"hello')}: {} }
+        }`
+      );
+      for (const format of ['json', 'dts'] as const) {
+        expect(() =>
+          generateEventRegistryTypes({
+            project: path.join(dir, 'tsconfig.json'),
+            format,
+          })
+        ).toThrow('Invalid event name');
+      }
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }

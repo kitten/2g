@@ -121,7 +121,9 @@ function serializeRegistryEntry(
   symbol: ts.Symbol,
   checker: ts.TypeChecker
 ): TypegenEvent {
-  const key = symbol.getName().replace(/^"|"$/g, '');
+  const key = symbol.getName();
+  if (!key || /[^A-Za-z0-9_.:-]/.test(key))
+    throw new Error(`Invalid event name: ${JSON.stringify(key)}`);
   const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
   const type = declaration
     ? checker.getTypeOfSymbolAtLocation(symbol, declaration)
