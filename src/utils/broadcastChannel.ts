@@ -1,6 +1,5 @@
 import type net from 'node:net';
 
-import { ingestIpcSocket } from './ipc';
 import { LogStream, type EventSink } from './logStream';
 
 const MAX_SUBSCRIBER_BUFFERED = 4 * 1024 * 1024;
@@ -115,10 +114,6 @@ export class BroadcastChannel implements EventSink {
     };
     socket.on('close', detach);
     socket.on('error', detach);
-  }
-
-  ingest(socket: net.Socket) {
-    ingestIpcSocket(socket, this);
   }
 
   _writeln(line: string): boolean {
