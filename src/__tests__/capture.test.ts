@@ -1,19 +1,22 @@
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   INTERNAL_DEBUG_ENV,
+  INTERNAL_IPC_ENV,
   LOG_DEBUG_ENV,
   LOG_EVENTS_ENV,
 } from '../constants';
 import { captureEvents, type EventCapture } from '../capture';
 
 const INDEX_PATH = fileURLToPath(new URL('../index.ts', import.meta.url));
+const CAPTURE_PATH = fileURLToPath(new URL('../capture.ts', import.meta.url));
 
 const HOOK_SOURCE = `
 const Module = require('node:module');
@@ -62,6 +65,65 @@ function spawnChild(capture: EventCapture, script: string) {
 }
 
 describe('captureEvents', () => {
+  it.each([false, true])(
+    'captures a subtree inside an instrumented parent (explicit env: %s)',
+    async explicitEnv => {
+      const file = path.join(tmpDir, `parent-${explicitEnv}.jsonl`);
+      const flags = [
+        '--experimental-transform-types',
+        '--no-warnings',
+        '--require',
+        hookPath,
+      ];
+      const descendantScript = `
+        const { events } = require(${JSON.stringify(INDEX_PATH)});
+        events('captured')('descendant');
+      `;
+      const childScript = `
+        const { installEventLogger, events } = require(${JSON.stringify(INDEX_PATH)});
+        installEventLogger();
+        events('captured')('child');
+        require('node:child_process').spawn(process.execPath,
+          ${JSON.stringify([...flags, '-e', descendantScript])},
+          { stdio: 'ignore' });
+      `;
+      const parentScript = `
+        const { installEventLogger, events, flushEventLogger } = require(${JSON.stringify(INDEX_PATH)});
+        const { captureEvents } = require(${JSON.stringify(CAPTURE_PATH)});
+        const { spawn } = require('node:child_process');
+        (async () => {
+          installEventLogger(${JSON.stringify(file)});
+          events('parent')('before');
+          const ipc = process.env[${JSON.stringify(INTERNAL_IPC_ENV)}];
+          const capture = captureEvents({ filter: 'captured:*' });
+          const child = spawn(process.execPath,
+            ${JSON.stringify([...flags, '-e', childScript])},
+            capture.spawnOptions(${explicitEnv ? '{ env: process.env }' : ''}));
+          const received = await capture.attach(child).collect();
+          events('parent')('after');
+          await flushEventLogger();
+          process.stdout.write(JSON.stringify({ received,
+            unchanged: ipc === process.env[${JSON.stringify(INTERNAL_IPC_ENV)}] }));
+        })().catch(error => { console.error(error); process.exitCode = 1; });
+      `;
+      const { stdout } = await promisify(execFile)(
+        process.execPath,
+        [...flags, '-e', parentScript],
+        { env: { ...process.env, [INTERNAL_IPC_ENV]: '' }, timeout: 5000 }
+      );
+      const { received, unchanged } = JSON.parse(stdout);
+      expect(received.map((event: { _e: string }) => event._e).sort()).toEqual([
+        'captured:child',
+        'captured:descendant',
+      ]);
+      expect(unchanged).toBe(true);
+      const parentLog = await fs.readFile(file, 'utf8');
+      expect(parentLog).toContain('parent:before');
+      expect(parentLog).toContain('parent:after');
+      expect(parentLog).not.toContain('captured:');
+    }
+  );
+
   it('creates spawn options pointing LOG_EVENTS at the appended pipe', () => {
     const options = captureEvents().spawnOptions({
       env: { FOO: 'bar' },
