@@ -22,7 +22,7 @@ export interface LogStreamOptions {
 }
 
 export type LogStreamDrain = (
-  data: string,
+  data: string | Buffer,
   cb: (error?: Error | null) => void
 ) => void;
 
@@ -52,7 +52,7 @@ export class LogStream
   #opening = false;
   #reopening = false;
 
-  #output = '';
+  #output: string | Buffer = '';
   #len = 0;
   #lines: string[] = [];
   #head = 0;
@@ -170,20 +170,14 @@ export class LogStream
     this.#busyRetries = 0;
     this.emit('write', written);
 
-    if (written === this.#output.length) {
-      // Complete write; exact for ASCII, the common case for JSONL
-      this.#len -= this.#output.length;
-      this.#output = '';
+    this.#len -= this.#output.length;
+    if (written < Buffer.byteLength(this.#output)) {
+      if (typeof this.#output === 'string')
+        this.#output = Buffer.from(this.#output);
+      this.#output = this.#output.subarray(written);
+      this.#len += this.#output.length;
     } else {
-      const outputLength = Buffer.byteLength(this.#output);
-      if (outputLength > written) {
-        const output = Buffer.from(this.#output).toString('utf8', written);
-        this.#len -= this.#output.length - output.length;
-        this.#output = output;
-      } else {
-        this.#len -= this.#output.length;
-        this.#output = '';
-      }
+      this.#output = '';
     }
 
     if (this.#output) {
@@ -333,7 +327,7 @@ export class LogStream
     if (this.#drain != null && (this.#draining || this.#fd < 0)) {
       this.#drain(this.#output, this.#onDrained);
     } else {
-      fs.write(this.#fd, this.#output, this.#onRelease);
+      fs.write(this.#fd, this.#output as string, this.#onRelease);
     }
   }
 

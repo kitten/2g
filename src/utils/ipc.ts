@@ -9,7 +9,12 @@ import {
   LOG_EVENTS_ENV,
 } from '../constants';
 import { eventLogState } from '../state';
-import type { EventSink, LogStream, LogStreamOpener } from './logStream';
+import type {
+  EventSink,
+  LogStream,
+  LogStreamDrain,
+  LogStreamOpener,
+} from './logStream';
 import { registerProcessCleanup } from './processExit';
 import { listenSocket, removeSocket } from './sessionSockets';
 
@@ -112,7 +117,7 @@ export function openIpc(
         // The socket owns the borrowed fd; its close must stop the stream
         socket.once('close', () => stream.destroy());
         // A pending drain must keep the process alive until it flushes
-        const drain = (data: string, cb: (error?: Error | null) => void) => {
+        const drain: LogStreamDrain = (data, cb) => {
           socket.ref();
           socket.write(data, error => {
             socket.unref();
