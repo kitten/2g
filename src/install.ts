@@ -79,8 +79,8 @@ export function installEventLogger(
       destination = explicitTarget;
       redirectConsoleForFd(destination);
     } else {
-      destination = path.format(explicitTarget);
-      eventLogState.logPath = explicitTarget.dir || process.cwd();
+      destination = explicitTarget.file;
+      eventLogState.logPath = explicitTarget.dir;
     }
     eventLogState.debug = options?.debug ?? true;
     eventLogState.eventLoggerInfo =
@@ -144,7 +144,11 @@ function parseLogTarget(target: string | number | undefined) {
   if (`${fd}` === target && fd > 0 && Number.isSafeInteger(fd)) return fd;
 
   try {
-    return path.parse(target);
+    const parsedPath = path.parse(target);
+    return {
+      file: path.format(parsedPath),
+      dir: parsedPath.dir || process.cwd(),
+    };
   } catch {
     return undefined;
   }

@@ -330,6 +330,45 @@ describe('install session', () => {
 });
 
 describe('install explicit file target', () => {
+  it.each([false, true])(
+    'handles an unavailable working directory (fallback target: %s)',
+    async fallback => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-cwd-'));
+      const file = path.join(dir, 'events.jsonl');
+      const restoreEvents = setEnv(LOG_EVENTS_ENV, 'events.jsonl');
+      const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+
+      try {
+        vi.resetModules();
+        const { installEventLogger, getEventLoggerInfo, flushEventLogger } =
+          await import('../install');
+        const cwd = vi.spyOn(process, 'cwd').mockImplementation(() => {
+          throw Object.assign(new Error('cwd unavailable'), { code: 'ENOENT' });
+        });
+        try {
+          installEventLogger(fallback ? file : undefined);
+        } finally {
+          cwd.mockRestore();
+        }
+        if (fallback) {
+          expect(getEventLoggerInfo()).toMatchObject({
+            destination: 'file',
+            file,
+          });
+          await flushEventLogger();
+          expect(await fs.readFile(file, 'utf8')).toContain('"root:init"');
+        } else {
+          expect(getEventLoggerInfo()).toBeNull();
+        }
+      } finally {
+        _resetEventLogState();
+        restoreEvents();
+        restoreIpc();
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it.each([
     ['file', '1.2.3'],
     ['fd', '1.2.3'],
