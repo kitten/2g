@@ -191,11 +191,12 @@ export class LogStream
     } else if (this.#closing && !this.#ending) {
       this.#writing = false;
       this.#close();
-    } else if (this.#lines.length - this.#head > this.#partialLine) {
-      this.#writeLine();
     } else if (this.#reopening) {
+      // Rotation has already renamed the file; switch fds before the next batch.
       this.#writing = false;
       this.#reopen();
+    } else if (this.#lines.length - this.#head > this.#partialLine) {
+      this.#writeLine();
     } else if (this.#ending) {
       this.#writing = false;
       this.#close();

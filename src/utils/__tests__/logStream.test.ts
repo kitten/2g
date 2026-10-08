@@ -1,3 +1,4 @@
+import { renameSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,6 +8,33 @@ import { describe, expect, it } from 'vitest';
 import { LogStream } from '../logStream';
 
 describe('logStream', () => {
+  it('reopens after the current batch before draining queued batches', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-stream-'));
+    const file = path.join(dir, '0.jsonl');
+    const rotated = path.join(dir, '1.jsonl');
+    const stream = new LogStream(file);
+
+    try {
+      await once(stream, 'ready');
+      const batch = `${'x'.repeat(65_535)}\n`;
+      stream.once('write', () => {
+        // Rotate synchronously, as the session's write listener does.
+        renameSync(file, rotated);
+        stream.reopen();
+      });
+      stream._writeln(batch);
+      stream._writeln('queued\n');
+      await flush(stream);
+
+      expect(await fs.readFile(rotated, 'utf8')).toBe(batch);
+      expect(await fs.readFile(file, 'utf8')).toBe('queued\n');
+    } finally {
+      stream.destroy();
+      await once(stream, 'close');
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('reopens file streams without dropping queued lines', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-stream-'));
     const file = path.join(dir, '0.jsonl');

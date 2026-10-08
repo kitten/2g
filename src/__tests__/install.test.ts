@@ -7,6 +7,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   DEBUG_SEGMENTS,
+  DEFAULT_SEGMENTS,
+  DEFAULT_SEGMENT_SIZE,
   DEFAULT_RETAIN_MS,
   EVENT_LOG_FORMAT_VERSION,
   EVENT_LOG_TMP_DIR,
@@ -23,6 +25,53 @@ import { openIpc } from '../utils/ipc';
 import { LogStream } from '../utils/logStream';
 
 describe('install session', () => {
+  it('retains the newest events when a burst rotates through the entire ring', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
+    const restoreDir = setSessionDir(dir);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const session = createSession({
+      maxSegments: DEFAULT_SEGMENTS,
+      maxSegmentSize: DEFAULT_SEGMENT_SIZE,
+    });
+
+    try {
+      const lines = Array.from({ length: 20_000 }, (_, index) =>
+        JSON.stringify({
+          _e: 'test:burst',
+          _t: index,
+          index,
+          pad: 'x'.repeat(100),
+        })
+      );
+      for (const line of lines) session.sink._writeln(`${line}\n`);
+      await new Promise<void>((resolve, reject) =>
+        session.sink.flush!(error => (error ? reject(error) : resolve()))
+      );
+
+      const segments = await Promise.all(
+        Array.from({ length: DEFAULT_SEGMENTS }, (_, index) =>
+          fs.readFile(path.join(session.sessionDir, `${index}.jsonl`), 'utf8')
+        )
+      );
+      const retained = segments.reverse().join('').trim().split('\n');
+      expect(retained.length).toBeGreaterThan(0);
+      expect(retained.length).toBeLessThan(lines.length);
+      expect(retained).toEqual(lines.slice(-retained.length));
+      // A segment may overshoot by one write batch, but not by the whole burst.
+      for (const segment of segments) {
+        expect(Buffer.byteLength(segment)).toBeLessThanOrEqual(
+          DEFAULT_SEGMENT_SIZE + 65_536 + lines[lines.length - 1].length + 1
+        );
+      }
+    } finally {
+      await new Promise<void>(resolve => session.sink.end(resolve));
+      session.destroy();
+      restoreDir();
+      restoreIpc();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('creates session metadata before sockets are ready and forwards worker lines', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
     const restoreDir = setSessionDir(dir);
