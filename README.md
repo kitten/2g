@@ -72,12 +72,17 @@ Tap into the session from another terminal:
 
 `installEventLogger` resolves its destination in precedence order:
 
-1. An explicit `LOG_EVENTS` target — an fd number or a file path, from the environment or
-   passed directly
-2. A parent 2g process, inherited through the environment; events forward into the
-   parent's session over IPC
-3. A session in the system temporary directory, when an options object is passed
-4. Otherwise logging stays inactive and all calls are no-ops
+1. An already installed logger; later calls do not change its destination or options
+2. A parent 2g process, inherited through the environment; events forward to the
+   parent's logger over IPC
+3. A `LOG_EVENTS` environment target — an fd number or a file path
+4. An fd number or file path passed directly
+5. A session in the system temporary directory, when an options object is passed
+   without `session: false`
+6. Otherwise logging stays inactive and all calls are no-ops
+
+Importing `2g` automatically attaches to an inherited parent logger. If this installs
+the logger, a later `installEventLogger` call cannot override its destination or options.
 
 Calling `installEventLogger()` with no arguments activates logging only when `LOG_EVENTS`
 or a parent process is present — the right idiom for child processes, workers, and
@@ -104,11 +109,14 @@ disables session capture without affecting the host process.
 `events.debug(category)` creates a logger for chatty, debug-level events. Debug events
 carry `_l: 1` on the wire. Session output drops them at the emit site — keeping the
 rotation budget for normal history — unless `LOG_DEBUG` is set or `installEventLogger`
-is passed `debug: true`; explicit `LOG_EVENTS` targets record them. `tap` and `export`
+is passed `debug: true`; explicit file/fd targets record them by default. An explicit
+`debug` option takes precedence over these defaults when installing. `tap` and `export`
 skip debug events unless `--debug` (CLI) or `debug: true` (API) is passed.
 
-`LOG_DEBUG` also prints matching events to stderr in a readable format while structured
-logging continues unchanged:
+In session mode, `LOG_DEBUG` also prints matching events, including forwarded child
+events, to stderr in a readable format. Explicit file/fd targets do not add this mirror,
+and `debug: true` alone only enables recording. The `LOG_DEBUG` filter selects what is
+printed, not which debug events are recorded:
 
 ```sh
 LOG_DEBUG=metro:* expo start

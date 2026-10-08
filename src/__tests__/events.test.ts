@@ -90,34 +90,46 @@ describe('api', () => {
     expect(Object.keys(JSON.parse(lines[2]))).toEqual(['_e', '_t']);
   });
 
-  it('flushes buffered events and reports the destination info', async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-flush-'));
-    const logFile = path.join(dir, 'events.jsonl');
-    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
-    const restoreLog = setEnv(LOG_EVENTS_ENV, logFile);
-    vi.resetModules();
+  it.each([undefined, 'argument.jsonl'])(
+    'records to LOG_EVENTS without mirroring LOG_DEBUG (argument: %s)',
+    async argument => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-flush-'));
+      const logFile = path.join(dir, 'events.jsonl');
+      const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+      const restoreLog = setEnv(LOG_EVENTS_ENV, logFile);
+      const restoreDebug = setEnv(LOG_DEBUG_ENV, 'custom:*');
+      const write = vi
+        .spyOn(process.stderr, 'write')
+        .mockImplementation(() => true);
+      vi.resetModules();
 
-    try {
-      const { installEventLogger, flushEventLogger, getEventLoggerInfo } =
-        await import('../install');
-      const { events } = await import('../events');
-      installEventLogger();
-      events('custom')('tick', { n: 1 });
-      events.debug('custom')('verbose', { n: 2 });
-      await flushEventLogger();
-      const output = await fs.readFile(logFile, 'utf8');
-      expect(output).toContain('"custom:tick"');
-      expect(output).toContain('"custom:verbose"');
-      expect(getEventLoggerInfo()).toMatchObject({
-        destination: 'file',
-        debug: true,
-      });
-    } finally {
-      restoreIpc();
-      restoreLog();
-      await fs.rm(dir, { recursive: true, force: true });
+      try {
+        const { installEventLogger, flushEventLogger, getEventLoggerInfo } =
+          await import('../install');
+        const { events } = await import('../events');
+        installEventLogger(argument && path.join(dir, argument));
+        events('custom')('tick', { n: 1 });
+        events.debug('custom')('verbose', { n: 2 });
+        await flushEventLogger();
+        const output = await fs.readFile(logFile, 'utf8');
+        expect(output).toContain('"custom:tick"');
+        expect(output).toContain('"custom:verbose"');
+        expect(getEventLoggerInfo()).toMatchObject({
+          destination: 'file',
+          debug: true,
+          file: logFile,
+        });
+        expect(write).not.toHaveBeenCalled();
+        expect(await fs.readdir(dir)).toEqual(['events.jsonl']);
+      } finally {
+        write.mockRestore();
+        restoreDebug();
+        restoreIpc();
+        restoreLog();
+        await fs.rm(dir, { recursive: true, force: true });
+      }
     }
-  });
+  );
 
   it('skips session capture with session: false', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
@@ -206,12 +218,15 @@ describe('api', () => {
     }
   });
 
-  it('records session debug events with debug: true', async () => {
+  it('records session debug events with debug: true without stderr mirroring', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
     const restoreDir = setSessionDir(dir);
     const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
     const restoreLog = setEnv(LOG_EVENTS_ENV, undefined);
     const restoreDebug = setEnv(LOG_DEBUG_ENV, undefined);
+    const write = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
     vi.resetModules();
 
     try {
@@ -228,7 +243,9 @@ describe('api', () => {
       expect(
         await fs.readFile(path.join(sessionDir!, '0.jsonl'), 'utf8')
       ).toContain('"custom:verbose"');
+      expect(write).not.toHaveBeenCalled();
     } finally {
+      write.mockRestore();
       restoreDir();
       restoreIpc();
       restoreLog();
