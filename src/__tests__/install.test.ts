@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { closeSync, existsSync, openSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -330,6 +330,54 @@ describe('install session', () => {
 });
 
 describe('install explicit file target', () => {
+  it.each([
+    ['file', '1.2.3'],
+    ['fd', '1.2.3'],
+    ['file', undefined],
+    ['fd', undefined],
+  ] as const)(
+    'preserves version %s/%s across repeated installation',
+    async (target, version) => {
+      const dir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'event-log-version-')
+      );
+      const file = path.join(dir, 'events.jsonl');
+      const fd = target === 'fd' ? openSync(file, 'w') : undefined;
+      const restoreEvents = setEnv(LOG_EVENTS_ENV, String(fd ?? file));
+      const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+
+      try {
+        vi.resetModules();
+        const { installEventLogger, flushEventLogger } =
+          await import('../install');
+        installEventLogger(version == null ? undefined : { version });
+        installEventLogger({ version: '9.9.9' });
+        await flushEventLogger();
+        const lines = (await fs.readFile(file, 'utf8'))
+          .trim()
+          .split('\n')
+          .map(line => JSON.parse(line));
+        expect(lines).toEqual([
+          expect.objectContaining({
+            _e: 'root:init',
+            version: version ?? 'UNVERSIONED',
+          }),
+        ]);
+      } finally {
+        const sink = eventLogState.primarySink as LogStream | undefined;
+        const closed =
+          sink && new Promise<void>(resolve => sink.once('close', resolve));
+        _resetEventLogState();
+        await closed;
+        if (!sink && fd != null) closeSync(fd);
+        restoreEvents();
+        restoreIpc();
+        vi.resetModules();
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('tags worker events with a worker id when logging to a file', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-file-'));
     const file = path.join(dir, 'events.jsonl');

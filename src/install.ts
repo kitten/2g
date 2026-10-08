@@ -83,7 +83,7 @@ export function installEventLogger(
     eventLogState.eventLoggerInfo = getExplicitTargetInfo(explicitTarget);
     const sink = createPrimarySink(explicitTarget);
     publishTempIpcSink(sink);
-    activateSink(sink);
+    activateSink(sink, options?.version);
     return;
   }
 
