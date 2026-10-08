@@ -26,13 +26,17 @@ describe('logStream', () => {
       await once(stream, 'ready');
       const write = vi.spyOn(syncFs, 'write').mockImplementation(((
         fd: number,
-        data: string | Buffer,
+        data: Buffer,
+        offset: number,
+        length: number,
+        _position: null,
         cb: (error: null, written: number) => void
       ) => {
-        const bytes = typeof data === 'string' ? Buffer.from(data) : data;
         const written = syncFs.writeSync(
           fd,
-          write.mock.calls.length <= 3 ? bytes.subarray(0, limit) : bytes
+          data,
+          offset,
+          write.mock.calls.length <= 3 ? Math.min(length, limit) : length
         );
         setImmediate(() => cb(null, written));
       }) as typeof syncFs.write);
@@ -70,12 +74,14 @@ describe('logStream', () => {
     await once(stream, 'ready');
     const write = vi.spyOn(syncFs, 'write').mockImplementation(((
       fd: number,
-      data: string | Buffer,
+      data: Buffer,
+      offset: number,
+      length: number,
+      _position: null,
       cb: (error: NodeJS.ErrnoException | null, written: number) => void
     ) => {
       if (write.mock.calls.length === 1) {
-        const bytes = typeof data === 'string' ? Buffer.from(data) : data;
-        const written = syncFs.writeSync(fd, bytes.subarray(0, 1));
+        const written = syncFs.writeSync(fd, data, offset, Math.min(length, 1));
         setImmediate(() => cb(null, written));
       } else {
         setImmediate(() =>
@@ -96,6 +102,31 @@ describe('logStream', () => {
       stream.destroy();
       await once(stream, 'close');
       await handle.close();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('writes only the active bytes when reusing and growing the batch buffer', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-unicode-'));
+    const file = path.join(dir, 'events.jsonl');
+    const stream = new LogStream(file);
+    const lines = [
+      `${'漢'.repeat(65_536)}\n`,
+      'ascii\n',
+      `${'😀'.repeat(90_000)}\n`,
+      'é\n',
+    ];
+
+    try {
+      for (const line of lines) {
+        stream._writeln(line);
+        await flush(stream);
+        expect(stream.buffered).toBe(0);
+      }
+      expect(await fs.readFile(file)).toEqual(Buffer.from(lines.join('')));
+    } finally {
+      stream.destroy();
+      await once(stream, 'close');
       await fs.rm(dir, { recursive: true, force: true });
     }
   });
