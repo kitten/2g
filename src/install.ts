@@ -39,32 +39,29 @@ export function installChildEventLogger(
     return true;
   }
 
+  setWorkerMetadata();
+  return connectToParent(options);
+}
+
+function setWorkerMetadata() {
   const workerId = getProcessWorkerId();
   if (workerId) {
     eventLogState.eventMeta = { _w: workerId };
-  }
-
-  const ipcPath = getParentIpcPath();
-  if (ipcPath) {
-    eventLogState.debug =
-      options?.debug ??
-      (isParentDebugEnabled() || !!process.env[LOG_DEBUG_ENV]);
-    connectToParent(ipcPath);
-    return true;
-  } else {
-    return false;
   }
 }
 
 export function installEventLogger(
   targetOrOptions?: string | number | InstallEventLoggerOptions
 ): void {
+  if (eventLogState.primarySink) return;
+  setWorkerMetadata();
+
   const options =
     targetOrOptions && typeof targetOrOptions === 'object'
       ? targetOrOptions
       : undefined;
 
-  if (installChildEventLogger(options)) {
+  if (connectToParent(options)) {
     return;
   }
 
@@ -77,11 +74,35 @@ export function installEventLogger(
     );
 
   if (explicitTarget != null) {
-    if (typeof explicitTarget === 'number')
-      redirectConsoleForFd(explicitTarget);
+    let destination: string | number;
+    if (typeof explicitTarget === 'number') {
+      destination = explicitTarget;
+      redirectConsoleForFd(destination);
+    } else {
+      destination = path.format(explicitTarget);
+      eventLogState.logPath = explicitTarget.dir || process.cwd();
+    }
     eventLogState.debug = options?.debug ?? true;
-    eventLogState.eventLoggerInfo = getExplicitTargetInfo(explicitTarget);
-    const sink = createPrimarySink(explicitTarget);
+    eventLogState.eventLoggerInfo =
+      typeof destination === 'number'
+        ? {
+            destination:
+              destination === 1
+                ? 'stdout'
+                : destination === 2
+                  ? 'stderr'
+                  : 'fd',
+            isUserVisibleOutput: destination === 1 || destination === 2,
+            debug: eventLogState.debug,
+            fd: destination,
+          }
+        : {
+            destination: 'file',
+            isUserVisibleOutput: false,
+            debug: eventLogState.debug,
+            file: destination,
+          };
+    const sink = createPrimarySink(destination);
     publishTempIpcSink(sink);
     activateSink(sink, options?.version);
     return;
@@ -98,7 +119,6 @@ export function installEventLogger(
       sessionDir: session.sessionDir,
     };
     activateSink(session.sink, options.version);
-    return;
   }
 }
 
@@ -124,10 +144,7 @@ function parseLogTarget(target: string | number | undefined) {
   if (`${fd}` === target && fd > 0 && Number.isSafeInteger(fd)) return fd;
 
   try {
-    const parsedPath = path.parse(target);
-    const destination = path.format(parsedPath);
-    eventLogState.logPath = parsedPath.dir || process.cwd();
-    return destination;
+    return path.parse(target);
   } catch {
     return undefined;
   }
@@ -146,46 +163,29 @@ function createPrimarySink(
   return stream;
 }
 
-function getExplicitTargetInfo(target: string | number): EventLoggerInfo {
-  if (typeof target === 'number') {
-    return {
-      destination: target === 1 ? 'stdout' : target === 2 ? 'stderr' : 'fd',
-      isUserVisibleOutput: target === 1 || target === 2,
-      debug: eventLogState.debug,
-      fd: target,
-    };
-  }
-
-  return {
-    destination: 'file',
-    isUserVisibleOutput: false,
-    debug: eventLogState.debug,
-    file: target,
-  };
-}
-
-function getInitMetadata(version?: string) {
-  return {
+function activateSink(sink: EventSink, version?: string) {
+  eventLogState.primarySink = sink;
+  const metadata = {
     format: 'v0-jsonl',
     formatVersion: EVENT_LOG_FORMAT_VERSION,
     version: version ?? 'UNVERSIONED',
     processOrigin: getProcessOrigin() ?? undefined,
   };
+  rootEvent('init', metadata);
 }
 
-function activateSink(sink: EventSink, version?: string) {
-  eventLogState.primarySink = sink;
-  rootEvent('init', getInitMetadata(version));
-}
+function connectToParent(options?: InstallEventLoggerOptions): boolean {
+  const ipcPath = getParentIpcPath();
+  if (!ipcPath) return false;
 
-function connectToParent(ipcPath: string) {
-  eventLogState.primarySink = createPrimarySink(openIpc(ipcPath), {
-    closeFd: false,
-  });
+  eventLogState.debug =
+    options?.debug ?? (isParentDebugEnabled() || !!process.env[LOG_DEBUG_ENV]);
+  const sink = createPrimarySink(openIpc(ipcPath), { closeFd: false });
   eventLogState.eventLoggerInfo = {
     destination: 'ipc',
     isUserVisibleOutput: false,
     debug: eventLogState.debug,
   };
-  rootEvent('init', getInitMetadata());
+  activateSink(sink);
+  return true;
 }
