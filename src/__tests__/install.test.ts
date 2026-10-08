@@ -500,6 +500,7 @@ describe('install auto-connect', () => {
       // Importing the library auto-connects because __eventLogIpc is present.
       const {
         installChildEventLogger,
+        installEventLogger,
         getEventLoggerInfo,
         events,
         flushEventLogger,
@@ -509,6 +510,13 @@ describe('install auto-connect', () => {
       // A repeat call is a no-op: it reports the active logger without reconnecting.
       expect(installChildEventLogger()).toBe(true);
       expect(getEventLoggerInfo()?.destination).toBe('ipc');
+
+      const info = getEventLoggerInfo();
+      const sink = eventLogState.primarySink;
+      installEventLogger({ debug: !info?.debug });
+      expect(getEventLoggerInfo()).toBe(info);
+      expect(eventLogState.primarySink).toBe(sink);
+      expect(eventLogState.debug).toBe(info?.debug);
 
       events('custom')('ping', {});
       await flushEventLogger();
@@ -595,6 +603,7 @@ describe('install auto-connect', () => {
       } = await import('../index');
       // The on-import auto-connect was a no-op with no parent.
       expect(installChildEventLogger()).toBe(false);
+      installEventLogger();
       expect(getEventLoggerInfo()).toBeNull();
 
       // A subsequent explicit install still proceeds normally.
