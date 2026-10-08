@@ -164,7 +164,7 @@ function formatDts(events: TypegenEvent[]) {
     lines.push(`    '${event.key}': {`);
     for (const [name, type] of Object.entries(event.fields)) {
       const optional = event.optionalFields.includes(name) ? '?' : '';
-      lines.push(`      ${name}${optional}: ${type};`);
+      lines.push(`      ${JSON.stringify(name)}${optional}: ${type};`);
     }
     lines.push('    };');
   }
