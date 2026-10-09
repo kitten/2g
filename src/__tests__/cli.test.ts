@@ -7,6 +7,34 @@ import { describe, expect, it, vi } from 'vitest';
 import { main } from '../cli';
 
 describe('cli', () => {
+  it.skipIf(process.platform === 'win32').each([
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+    ['SIGKILL', 137],
+  ] as const)(
+    'returns a failure for a child terminated by %s (status %i) after writing its trace',
+    async (signal, exitCode) => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-cli-'));
+      const output = path.join(dir, 'trace.json');
+      const previousExitCode = process.exitCode;
+      const script =
+        'require("node:fs").writeSync(3,JSON.stringify({_e:"build:bundle",_t:1,_d:42})+"\\n");' +
+        `process.kill(process.pid, ${JSON.stringify(signal)});`;
+
+      try {
+        await expect(
+          main(['record', '-o', output, '--', process.execPath, '-e', script])
+        ).resolves.toBe(exitCode);
+        const trace = JSON.parse(await fs.readFile(output, 'utf8'));
+        expect(JSON.stringify(trace)).toContain('build:bundle');
+        expect(process.exitCode).toBe(previousExitCode);
+      } finally {
+        process.exitCode = previousExitCode;
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it.each([0, 7, 255])(
     'returns the recorded child exit code %i after writing its trace',
     async exitCode => {

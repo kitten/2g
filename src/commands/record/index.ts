@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import { constants } from 'node:os';
 import { parseArgs } from 'node:util';
 
 import { captureEvents } from '../../capture';
@@ -59,7 +60,9 @@ export async function runRecordCli(args: string[]) {
   process.on('SIGTERM', onSignal);
 
   const exited = new Promise<number>((resolve, reject) => {
-    child.on('exit', code => resolve(code ?? 0));
+    child.on('exit', (code, signal) =>
+      resolve(code ?? (signal ? 128 + constants.signals[signal] : 1))
+    );
     child.on('error', error =>
       reject(new Error(`Failed to run ${command[0]}: ${error.message}`))
     );
