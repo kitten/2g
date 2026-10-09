@@ -43,25 +43,6 @@ export function _setSessionBaseDir(dir: string | undefined) {
   else delete globalScope[SESSION_BASE_DIR_OVERRIDE];
 }
 
-// Only the newest session per pid can be alive: whatever owns a recycled PID
-// now is not the process behind any older dir claiming it
-export function newestSessionIds(
-  sessions: Array<{ id: string; pid: number; startedAt: number }>
-) {
-  const newest = new Map<number, { id: string; startedAt: number }>();
-  for (const session of sessions) {
-    const current = newest.get(session.pid);
-    if (
-      !current ||
-      session.startedAt > current.startedAt ||
-      (session.startedAt === current.startedAt && session.id > current.id)
-    ) {
-      newest.set(session.pid, session);
-    }
-  }
-  return new Set([...newest.values()].map(session => session.id));
-}
-
 export function isPidAlive(pid: number) {
   if (!pid || pid === process.pid) return true;
   try {
@@ -83,17 +64,24 @@ export function getSessionEntries() {
         return { id: entry.name, dir, meta: readMetaSync(dir), alive: false };
       })
       .filter((entry): entry is SessionEntry => entry.meta !== null);
-    const newest = newestSessionIds(
-      entries.map(entry => ({
-        id: entry.id,
-        pid: entry.meta.pid,
-        startedAt: entry.meta.startedAt,
-      }))
-    );
-    return entries.map(entry => ({
-      ...entry,
-      alive: isPidAlive(entry.meta.pid) && newest.has(entry.id),
-    }));
+    // Only the newest session per pid can be alive; older generations cannot
+    // belong to the process that owns a recycled PID now.
+    const newest = new Map<number, SessionEntry>();
+    for (const entry of entries) {
+      const current = newest.get(entry.meta.pid);
+      if (
+        !current ||
+        entry.meta.startedAt > current.meta.startedAt ||
+        (entry.meta.startedAt === current.meta.startedAt &&
+          entry.id > current.id)
+      ) {
+        newest.set(entry.meta.pid, entry);
+      }
+    }
+    for (const entry of newest.values()) {
+      entry.alive = isPidAlive(entry.meta.pid);
+    }
+    return entries;
   } catch {
     return [];
   }
