@@ -116,7 +116,8 @@ describe('clean', () => {
       path.join(sessionDir, SESSION_FILES.meta),
       JSON.stringify({
         pid: 123,
-        metadata: { format: 'unknown' },
+        format: 'unknown',
+        metadata: {},
         startedAt: Date.now(),
         command: 'old',
         cwd: process.cwd(),
@@ -128,7 +129,7 @@ describe('clean', () => {
 
     try {
       expect(readMetaSync(sessionDir)).toMatchObject({
-        metadata: { format: 'unknown' },
+        format: 'unknown',
       });
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
@@ -147,7 +148,8 @@ async function writeMeta(sessionDir: string, pid: number, startedAt: number) {
     path.join(sessionDir, SESSION_FILES.meta),
     JSON.stringify({
       pid,
-      metadata: { format: EVENT_LOG_FORMAT },
+      format: EVENT_LOG_FORMAT,
+      metadata: {},
       startedAt,
       command: `command-${pid}`,
       cwd: process.cwd(),

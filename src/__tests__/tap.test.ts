@@ -38,7 +38,8 @@ describe('tap', () => {
       await fs.writeFile(
         path.join(dir, SESSION_FILES.meta),
         JSON.stringify({
-          metadata: { format: EVENT_LOG_FORMAT },
+          format: EVENT_LOG_FORMAT,
+          metadata: {},
           socket: process.platform === 'win32' ? socketPath : 'cleanup.sock',
           maxSegments: 1,
         })
@@ -206,7 +207,8 @@ describe('tap', () => {
       path.join(sessionDir, SESSION_FILES.meta),
       JSON.stringify({
         pid: process.pid,
-        metadata: { format: EVENT_LOG_FORMAT },
+        format: EVENT_LOG_FORMAT,
+        metadata: {},
         startedAt: Date.now(),
         command: 'custom-socket',
         cwd: process.cwd(),
@@ -404,33 +406,42 @@ describe('tap', () => {
     ).toBeNull();
   });
 
-  it('discovers sessions without validating their format', async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-tap-'));
-    const incompatible = path.join(dir, '999');
-    const restoreDir = setSessionDir(dir);
-    await fs.mkdir(incompatible, { recursive: true });
-    await fs.writeFile(
-      path.join(incompatible, SESSION_FILES.meta),
-      JSON.stringify({
-        pid: process.pid,
-        metadata: { format: 'unknown' },
-        startedAt: Date.now(),
-        command: 'incompatible',
-        cwd: process.cwd(),
-        socket: SESSION_FILES.liveSocket,
-        ipcSocket: SESSION_FILES.ipcSocket,
-      })
-    );
+  it.each([
+    { format: 'unknown', metadata: { version: '1' } },
+    { metadata: { version: '1' } },
+  ])(
+    'discovers sessions without requiring a known format: %j',
+    async fields => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-tap-'));
+      const incompatible = path.join(dir, '999');
+      const restoreDir = setSessionDir(dir);
+      await fs.mkdir(incompatible, { recursive: true });
+      await fs.writeFile(
+        path.join(incompatible, SESSION_FILES.meta),
+        JSON.stringify({
+          pid: process.pid,
+          ...fields,
+          startedAt: Date.now(),
+          command: 'incompatible',
+          cwd: process.cwd(),
+          socket: SESSION_FILES.liveSocket,
+          ipcSocket: SESSION_FILES.ipcSocket,
+        })
+      );
 
-    try {
-      expect(await listSessions()).toEqual([
-        expect.objectContaining({ command: 'incompatible' }),
-      ]);
-    } finally {
-      restoreDir();
-      await fs.rm(dir, { recursive: true, force: true });
+      try {
+        expect(await listSessions()).toEqual([
+          expect.objectContaining({
+            command: 'incompatible',
+            metadata: expect.objectContaining({ version: '1' }),
+          }),
+        ]);
+      } finally {
+        restoreDir();
+        await fs.rm(dir, { recursive: true, force: true });
+      }
     }
-  });
+  );
 
   it('filters and resolves sessions by exact and fuzzy selectors', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-tap-'));
@@ -559,7 +570,8 @@ async function writeMeta(
     path.join(sessionDir, SESSION_FILES.meta),
     JSON.stringify({
       pid,
-      metadata: { format: EVENT_LOG_FORMAT },
+      format: EVENT_LOG_FORMAT,
+      metadata: {},
       startedAt: Date.now(),
       command,
       cwd,

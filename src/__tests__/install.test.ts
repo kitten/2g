@@ -94,7 +94,8 @@ describe('install session', () => {
         command: 'test command',
         cwd: process.cwd(),
         maxSegments: 3,
-        metadata: { format: EVENT_LOG_FORMAT, version: '1.2.3' },
+        format: EVENT_LOG_FORMAT,
+        metadata: { version: '1.2.3' },
         socket:
           process.platform === 'win32' ? pipeName : SESSION_FILES.liveSocket,
         ipcSocket:
@@ -224,7 +225,8 @@ describe('install session', () => {
       path.join(staleDir, SESSION_FILES.meta),
       JSON.stringify({
         pid: 9_999_999,
-        metadata: { format: EVENT_LOG_FORMAT },
+        format: EVENT_LOG_FORMAT,
+        metadata: {},
         startedAt: Date.now() - DEFAULT_RETAIN_MS - 1_000,
         command: 'stale',
         cwd: process.cwd(),

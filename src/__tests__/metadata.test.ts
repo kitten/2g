@@ -57,9 +57,9 @@ it('initializes metadata in the session and root:init exactly once', async () =>
   const info = getEventLoggerInfo()!;
   installEventLogger({ metadata: { version: 'ignored' } });
   expect(readMetaSync(info.sessionDir!)?.metadata).toEqual({
-    format: EVENT_LOG_FORMAT,
     version: '1',
   });
+  expect(readMetaSync(info.sessionDir!)?.format).toBe(EVENT_LOG_FORMAT);
   const lines = await readEvents(path.join(info.sessionDir!, '0.jsonl'));
   expect(lines).toHaveLength(1);
   expect(lines[0]).toMatchObject({
@@ -72,9 +72,9 @@ it('initializes metadata in the session and root:init exactly once', async () =>
   expect(readMetaSync(info.sessionDir!)).not.toHaveProperty('formatVersion');
   updateEventLoggerMetadata({ version: '2' });
   expect(readMetaSync(info.sessionDir!)?.metadata).toEqual({
-    format: EVENT_LOG_FORMAT,
     version: '2',
   });
+  expect(readMetaSync(info.sessionDir!)?.format).toBe(EVENT_LOG_FORMAT);
 });
 
 it('persists shallow patches and later caller mutations without altering identity', async () => {
@@ -108,7 +108,6 @@ it('persists shallow patches and later caller mutations without altering identit
     url: null,
   } as EventLoggerMetadata);
   const expected = {
-    format: EVENT_LOG_FORMAT,
     version: '1',
     port: 8081,
     nested: { _value: 0 },
@@ -142,7 +141,6 @@ it('ignores undefined patch fields while retaining null and falsy values', async
   });
   const patch = {
     version: undefined,
-    format: undefined,
     port: 0,
     ready: false,
     devServerUrl: null,
@@ -150,7 +148,6 @@ it('ignores undefined patch fields while retaining null and falsy values', async
   };
   updateEventLoggerMetadata(patch);
   const expected = {
-    format: EVENT_LOG_FORMAT,
     version: '1',
     port: 0,
     ready: false,
@@ -159,7 +156,7 @@ it('ignores undefined patch fields while retaining null and falsy values', async
   };
   expect(readMetaSync(ctx.sessionDir)?.metadata).toEqual(expected);
   expect(ctx.meta.metadata.version).toBe('1');
-  expect(ctx.meta.metadata.format).toBe(EVENT_LOG_FORMAT);
+  expect(ctx.meta.format).toBe(EVENT_LOG_FORMAT);
   const [event] = await readEvents();
   const { _e, _t, ...emittedPatch } = event;
   expect(_e).toBe('root:update');
@@ -170,9 +167,7 @@ it('ignores undefined patch fields while retaining null and falsy values', async
     devServerUrl: null,
     nested: { keep: 0 },
   });
-  expect({ format: EVENT_LOG_FORMAT, version: '1', ...emittedPatch }).toEqual(
-    expected
-  );
+  expect({ version: '1', ...emittedPatch }).toEqual(expected);
   updateEventLoggerMetadata({ ready: true });
   expect(readMetaSync(ctx.sessionDir)?.metadata).toEqual({
     ...expected,
@@ -207,14 +202,10 @@ it('filters cycles and BigInts while preserving shared values and later updates'
   installEventLogger({ metadata: patch });
   const sessionDir = getEventLoggerInfo()!.sessionDir!;
   const file = path.join(sessionDir, '0.jsonl');
-  expect(readMetaSync(sessionDir)?.metadata).toEqual({
-    format: EVENT_LOG_FORMAT,
-    ...expected,
-  });
+  expect(readMetaSync(sessionDir)?.metadata).toEqual(expected);
   updateEventLoggerMetadata(patch);
   updateEventLoggerMetadata({ version: '3' });
   expect(readMetaSync(sessionDir)?.metadata).toEqual({
-    format: EVENT_LOG_FORMAT,
     ...expected,
     version: '3',
   });
@@ -237,12 +228,9 @@ it('continues recording when metadata persistence fails', async () => {
     await fs.readFile(path.join(session!.sessionDir, '0.jsonl'), 'utf8')
   ).toContain('"version":"2"');
   expect(session!.meta.metadata).toEqual({
-    format: EVENT_LOG_FORMAT,
     version: '2',
   });
-  expect(readMetaSync(session!.sessionDir)?.metadata).toEqual({
-    format: EVENT_LOG_FORMAT,
-  });
+  expect(readMetaSync(session!.sessionDir)?.metadata).toEqual({});
 });
 
 it('keeps the latest metadata after rotation and full teardown', async () => {
@@ -255,12 +243,10 @@ it('keeps the latest metadata after rotation and full teardown', async () => {
   }
   expect(await detectRotationLoss(ctx.sessionDir)).toBe(true);
   expect(readMetaSync(ctx.sessionDir)?.metadata).toEqual({
-    format: EVENT_LOG_FORMAT,
     version: '2',
   });
   ctx.destroy();
   expect(readMetaSync(ctx.sessionDir)?.metadata).toEqual({
-    format: EVENT_LOG_FORMAT,
     version: '2',
   });
 });
@@ -284,11 +270,9 @@ it("forwards child metadata without changing the parent's persisted metadata", a
       expect(await readEvents()).toEqual([JSON.parse(line)])
     );
     expect(readMetaSync(ctx.sessionDir)?.metadata).toEqual({
-      format: EVENT_LOG_FORMAT,
       version: 'parent',
     });
     expect(ctx.meta.metadata).toEqual({
-      format: EVENT_LOG_FORMAT,
       version: 'parent',
     });
   } finally {

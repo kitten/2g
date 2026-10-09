@@ -162,8 +162,8 @@ are omitted when saving.
 Metadata serialization omits circular references and BigInt values while retaining
 valid fields (omitted array elements become `null`).
 
-Use `metadata.version` for the application version. Persisted metadata also includes
-`format: 'v0-jsonl'` automatically.
+Use `metadata.version` for the application version. The session's `meta.json`
+stores `format: 'v0-jsonl'` at the top level, separate from application metadata.
 
 ### Deferred payload helpers
 
