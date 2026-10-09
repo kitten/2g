@@ -295,10 +295,12 @@ export class LogStream
     if (!this.#size) {
       const end = this.#lines.length - this.#partialLine;
       if (end > this.#head) {
-        let output = this.#lines[this.#head++];
+        let output = this.#lines[this.#head];
+        this.#lines[this.#head++] = '';
         // Batch accumulated lines into one write to avoid per-line syscalls
         while (this.#head < end && output.length < WRITE_BATCH_SIZE) {
-          output += this.#lines[this.#head++];
+          output += this.#lines[this.#head];
+          this.#lines[this.#head++] = '';
         }
         this.#len -= output.length;
         if (this.#output.length < output.length * 3)
@@ -307,6 +309,10 @@ export class LogStream
         this.#size = this.#output.write(output);
         if (this.#head === this.#lines.length) {
           this.#lines.length = 0;
+          this.#head = 0;
+        } else if (this.#head >= 1024 && this.#head * 2 >= this.#lines.length) {
+          // Bound consumed slots without copying the pending tail every batch.
+          this.#lines = this.#lines.slice(this.#head);
           this.#head = 0;
         }
       }

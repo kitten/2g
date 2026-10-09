@@ -8,6 +8,35 @@ import { describe, expect, it, vi } from 'vitest';
 import { LogStream, type LogStreamDrain } from '../logStream';
 
 describe('logStream', () => {
+  it('preserves queued lines and partial tails across repeated batch drains', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-queue-'));
+    const file = path.join(dir, 'events.jsonl');
+    const stream = new LogStream(file);
+    let expected = '';
+
+    try {
+      for (let round = 0; round < 3; round++) {
+        for (let i = 0; i < 6000; i++) {
+          const line = `${round}:${i}:${'漢😀'.repeat(32)}\n`;
+          stream.write(line);
+          expected += line;
+        }
+        stream.write('partial');
+        await flush(stream);
+        expect(await fs.readFile(file, 'utf8')).toBe(expected);
+        expect(stream.buffered).toBe('partial'.length);
+        expected += 'partial';
+      }
+      stream.end('\n');
+      await once(stream, 'close');
+      expect(await fs.readFile(file, 'utf8')).toBe(`${expected}\n`);
+      expect(stream.buffered).toBe(0);
+    } finally {
+      stream.destroy();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it.each(['', 'queued\n', `${'x'.repeat(65_535)}\nqueued\n`])(
     'completes end requested before the file opens (%#)',
     async data => {
