@@ -6,7 +6,11 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { cleanExitedSessionsSync, cleanStaleSessionsSync } from '../clean';
-import { _setSessionBaseDir, readMetaSync } from '../discovery';
+import {
+  _setSessionBaseDir,
+  getSessionEntries,
+  readMetaSync,
+} from '../discovery';
 import { listSessions } from '../sessions';
 import { resolveSocketPath } from '../utils/sessionSockets';
 import {
@@ -17,6 +21,40 @@ import {
 } from '../constants';
 
 describe('clean', () => {
+  it('checks each distinct pid only once and marks only its newest session alive', async () => {
+    const dir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'event-log-discovery-')
+    );
+    const restoreDir = setSessionDir(dir);
+    for (const pid of [9_999_998, 9_999_999]) {
+      await writeMeta(path.join(dir, `${pid}-old`), pid, 1);
+      await writeMeta(path.join(dir, `${pid}-a`), pid, 2);
+      await writeMeta(path.join(dir, `${pid}-b`), pid, 2);
+    }
+    const kill = vi.spyOn(process, 'kill').mockImplementation(pid => {
+      if (pid === 9_999_999) throw new Error('not running');
+      return true;
+    });
+    try {
+      const entries = getSessionEntries();
+      expect(entries).toHaveLength(6);
+      expect(
+        entries.filter(entry => entry.alive).map(entry => entry.id)
+      ).toEqual(['9999998-b']);
+      expect(kill).toHaveBeenCalledTimes(2);
+      expect(kill.mock.calls).toEqual(
+        expect.arrayContaining([
+          [9_999_998, 0],
+          [9_999_999, 0],
+        ])
+      );
+    } finally {
+      kill.mockRestore();
+      restoreDir();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('lists retained sessions using one discovery snapshot', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-list-'));
     const restoreDir = setSessionDir(dir);
