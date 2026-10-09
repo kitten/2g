@@ -2,7 +2,7 @@ import { bench, describe } from 'vitest';
 
 import { events } from '../events';
 import type { EventSink } from '../utils/logStream';
-import { writeEvent } from '../utils/serializeEvent';
+import { writeCompleteEvent, writeEvent } from '../utils/serializeEvent';
 
 const payload = {
   id: 'bundle-ios',
@@ -34,5 +34,21 @@ describe('event api overhead', () => {
 
   bench('event logger enabled serialization to sink', () => {
     writeEvent(sink, 'metro', 'bundling:progress', payload);
+  });
+
+  bench('completed span serialization to sink', () => {
+    writeCompleteEvent(sink, 'metro', 'bundling:done', payload, 42.25);
+  });
+
+  bench('completed debug worker span serialization to sink', () => {
+    writeCompleteEvent(
+      sink,
+      'metro',
+      'bundling:done',
+      payload,
+      42.25,
+      { _w: 'worker:1' },
+      1
+    );
   });
 });

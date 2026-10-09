@@ -67,10 +67,7 @@ export function writeCompleteEvent(
   level?: number
 ) {
   try {
-    let line = `{"_e":"${category}:${kind}","_t":${stringifyTimestamp()},"_d":${delta}`;
-    if (level) line += `,"_l":${level}`;
-    if (meta?._w) line += `,"_w":${stringifyWorkerId(meta._w)}`;
-    dest._writeln(`${appendPayload(line, payload)}}\n`);
+    dest._writeln(serializeEvent(category, kind, payload, meta, delta, level));
   } catch {}
 }
 
