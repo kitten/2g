@@ -58,6 +58,7 @@ export async function* tap(
 
     // New arrivals belong to live delivery, after this buffered snapshot.
     for (let remaining = live.buffer.length; remaining > 0; remaining--) {
+      if (signal?.aborted) break;
       const line = live.buffer.shift()!;
       const event = parseEventLine(line, options, eventFilter, since);
       if (event) {

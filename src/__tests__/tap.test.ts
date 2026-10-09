@@ -18,8 +18,58 @@ import { listSessions, resolveSession } from '../sessions';
 import { parseEventLine, parseSince } from '../utils/eventFilter';
 import type { ParsedEvent } from '../types';
 import { openLiveTap } from './fixtures/liveTap';
+import { createSocketAddress } from '../utils/sessionSockets';
 
 describe('tap', () => {
+  it.each(['before', 'during'])(
+    'stops when aborted %s buffered live delivery',
+    async phase => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-abort-'));
+      const address = createSocketAddress(dir, path.basename(dir), 'live');
+      await fs.writeFile(
+        path.join(dir, SESSION_FILES.meta),
+        JSON.stringify({
+          socket: address.name,
+          maxSegments: 1,
+        })
+      );
+      await fs.writeFile(
+        path.join(dir, '0.jsonl'),
+        '{"_e":"test:history","_t":0}\n'
+      );
+      let client: net.Socket | undefined;
+      let closed!: Promise<unknown>;
+      const server = net.createServer(socket => {
+        client = socket;
+        closed = once(socket, 'close');
+        socket.resume();
+        socket.end('{"_e":"test:first","_t":1}\n{"_e":"test:second","_t":2}\n');
+      });
+      await new Promise<void>(resolve => server.listen(address.path, resolve));
+      const abort = new AbortController();
+      const iterator = tap(dir, { follow: true, signal: abort.signal })[
+        Symbol.asyncIterator
+      ]();
+      try {
+        expect((await iterator.next()).value?._e).toBe('test:history');
+        // EOF closes the client only after both live lines have been buffered.
+        await closed;
+        if (phase === 'during') {
+          expect((await iterator.next()).value?._e).toBe('test:first');
+        }
+        abort.abort();
+        expect((await iterator.next()).done).toBe(true);
+        expect(getEventListeners(abort.signal, 'abort')).toHaveLength(0);
+      } finally {
+        abort.abort();
+        await iterator.return!();
+        client?.destroy();
+        await new Promise<void>(resolve => server.close(() => resolve()));
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('drains a closed live backlog in order while filtering invalid and debug lines', async () => {
     const live = await openLiveTap({ filter: 'test' });
     const rows = Array.from({ length: 6000 }, (_, i) => ({
