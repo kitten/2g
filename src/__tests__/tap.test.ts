@@ -127,7 +127,7 @@ describe('tap', () => {
     const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
     const session = createSession({
       command: 'test command',
-      version: '1.2.3',
+      metadata: { version: '1.2.3' },
     });
 
     try {
@@ -135,7 +135,7 @@ describe('tap', () => {
       expect(discovered[0]).toMatchObject({
         command: 'test command',
         formatVersion: EVENT_LOG_FORMAT_VERSION,
-        version: '1.2.3',
+        metadata: { version: '1.2.3' },
         origin: {
           argv: process.argv.slice(1),
           cwd: process.cwd(),

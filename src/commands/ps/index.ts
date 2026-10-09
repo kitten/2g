@@ -22,14 +22,14 @@ export async function runPsCli(args: string[] = []) {
     return;
   }
 
-  process.stdout.write('PID\tSTATUS\tSTARTED\tCOMMAND\tCWD\n');
+  process.stdout.write('PID\tSTATUS\tSTARTED\tCOMMAND\tCWD\tMETADATA\n');
   for (const session of sessions) {
     process.stdout.write(
       `${escapeTsv(session.pid)}\t${escapeTsv(
         session.alive ? 'alive' : 'exited'
       )}\t${escapeTsv(
         new Date(session.startedAt).toISOString()
-      )}\t${escapeTsv(session.command)}\t${escapeTsv(session.cwd)}\n`
+      )}\t${escapeTsv(session.command)}\t${escapeTsv(session.cwd)}\t${JSON.stringify(session.metadata)}\n`
     );
   }
 }

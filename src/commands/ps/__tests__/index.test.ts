@@ -23,6 +23,7 @@ describe('ps command', () => {
       expect(sessions[0]).toMatchObject({
         pid: process.pid,
         command: 'test command',
+        metadata: {},
         alive: true,
         sessionDir: path.join(dir, String(process.pid)),
       });
@@ -106,7 +107,8 @@ describe('ps command', () => {
   it('escapes TSV output fields', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-ps-'));
     const restoreDir = setSessionDir(dir);
-    await writeMeta(path.join(dir, '300'), 300, 'expo\tstart\nweb');
+    const metadata = { port: 8081, ready: false, url: 'line\nwith\ttabs' };
+    await writeMeta(path.join(dir, '300'), 300, 'expo\tstart\nweb', metadata);
     const write = vi
       .spyOn(process.stdout, 'write')
       .mockImplementation(() => true);
@@ -114,6 +116,15 @@ describe('ps command', () => {
     try {
       await runPsCli(['300']);
       expect(String(write.mock.calls[1][0])).toContain('expo\\tstart\\nweb');
+      expect(String(write.mock.calls[0][0])).toContain('METADATA');
+      expect(
+        JSON.parse(String(write.mock.calls[1][0]).trim().split('\t').at(-1)!)
+      ).toEqual(metadata);
+      write.mockClear();
+      await runPsCli(['300', '--json']);
+      expect(JSON.parse(String(write.mock.calls[0][0]))[0].metadata).toEqual(
+        metadata
+      );
     } finally {
       write.mockRestore();
       restoreDir();
@@ -125,7 +136,8 @@ describe('ps command', () => {
 async function writeMeta(
   sessionDir: string,
   pid = process.pid,
-  command = 'test command'
+  command = 'test command',
+  metadata?: Record<string, unknown>
 ) {
   await fs.mkdir(sessionDir, { recursive: true });
   await fs.writeFile(
@@ -135,6 +147,7 @@ async function writeMeta(
       formatVersion: EVENT_LOG_FORMAT_VERSION,
       startedAt: Date.now(),
       command,
+      metadata,
       cwd: process.cwd(),
       socket: SESSION_FILES.liveSocket,
       ipcSocket: SESSION_FILES.ipcSocket,

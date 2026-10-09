@@ -10,12 +10,13 @@ import {
   getEventLoggerInfo,
 } from '../install';
 import { createSession, type SessionContext } from '../session';
-import { _setSessionBaseDir, readMetaSync } from '../clean';
+import { _setSessionBaseDir, readMetaSync } from '../discovery';
 import { _resetEventLogState, eventLogState } from '../state';
 import { events } from '../events';
 import { LogStream } from '../utils/logStream';
 import { openIpc } from '../utils/ipc';
-import { listSessions, detectRotationLoss } from '../tap';
+import { detectRotationLoss } from '../tap';
+import { listSessions } from '../sessions';
 import type { EventLoggerMetadata } from '../types';
 
 let dir: string;
