@@ -8,6 +8,37 @@ import { describe, expect, it, vi } from 'vitest';
 import { LogStream, type LogStreamDrain } from '../logStream';
 
 describe('logStream', () => {
+  it.each(['', 'queued\n', `${'x'.repeat(65_535)}\nqueued\n`])(
+    'completes end requested before the file opens (%#)',
+    async data => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-end-'));
+      const file = path.join(dir, 'events.jsonl');
+      const stream = new LogStream(file);
+      const events: string[] = [];
+      stream.on('finish', () => events.push('finish'));
+      stream.on('close', () => events.push('close'));
+      const ended = vi.fn(() => events.push('callback'));
+
+      try {
+        if (data) stream.write(data);
+        stream.end(ended);
+        expect(stream.writable).toBe(false);
+        await waitFor(() => ended.mock.calls.length > 0);
+
+        expect(events).toEqual(['finish', 'close', 'callback']);
+        expect(await fs.readFile(file, 'utf8')).toBe(data);
+        expect(() => syncFs.fstatSync(stream.fd)).toThrow();
+      } finally {
+        if (!events.includes('close')) {
+          const closed = once(stream, 'close');
+          stream.destroy();
+          await closed;
+        }
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it.each([
     ['split two-byte character', 'é\n', 1],
     ['byte count equals string length', 'é\n', 2],
