@@ -158,6 +158,9 @@ their own metadata in `meta.json`, visible through `ps` and `list()`. Child upda
 do not change the parent's metadata. Top-level metadata keys starting with `_`
 are omitted when saving.
 
+Metadata serialization omits circular references and BigInt values while retaining
+valid fields (omitted array elements become `null`).
+
 Use `metadata.version` for the application version. Persisted metadata also includes
 `format: 'v0-jsonl'` automatically.
 

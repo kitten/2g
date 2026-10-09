@@ -150,9 +150,7 @@ it('handles serialization failures without throwing and never reads disabled inp
   _resetEventLogState();
   vi.stubEnv('LOG_EVENTS', '');
   const ctx = start({ version: '1' });
-  const cyclic: any = { version: '2' };
-  cyclic.self = cyclic;
-  const invalid = [cyclic, throwing, { version: '2', value: 1n }];
+  const invalid = [throwing, { version: '2', nested: throwing }];
   for (const patch of invalid)
     expect(() => updateEventLoggerMetadata(patch as any)).not.toThrow();
   expect(readMetaSync(ctx.sessionDir)?.metadata).toEqual({
@@ -160,6 +158,45 @@ it('handles serialization failures without throwing and never reads disabled inp
     version: '1',
   });
   expect(await readEvents()).toEqual([]);
+  expect(ctx.meta.metadata).toEqual({ format: EVENT_LOG_FORMAT, version: '1' });
+  updateEventLoggerMetadata({ version: '3' });
+  expect(readMetaSync(ctx.sessionDir)?.metadata.version).toBe('3');
+  expect(await readEvents()).toEqual([
+    expect.objectContaining({ _e: 'root:update', version: '3' }),
+  ]);
+});
+
+it('filters cycles and BigInts while preserving shared values and later updates', async () => {
+  const shared = { enabled: true };
+  const nested: any = { shared, invalid: 1n };
+  nested.self = nested;
+  nested.array = [nested, 1n, shared];
+  const patch = { version: '2', nested, first: shared, second: shared };
+  const expected = {
+    version: '2',
+    nested: { shared, array: [null, null, shared] },
+    first: shared,
+    second: shared,
+  };
+  installEventLogger({ metadata: patch });
+  const sessionDir = getEventLoggerInfo()!.sessionDir!;
+  const file = path.join(sessionDir, '0.jsonl');
+  expect(readMetaSync(sessionDir)?.metadata).toEqual({
+    format: EVENT_LOG_FORMAT,
+    ...expected,
+  });
+  updateEventLoggerMetadata(patch);
+  updateEventLoggerMetadata({ version: '3' });
+  expect(readMetaSync(sessionDir)?.metadata).toEqual({
+    format: EVENT_LOG_FORMAT,
+    ...expected,
+    version: '3',
+  });
+  expect(await readEvents(file)).toEqual([
+    expect.objectContaining({ _e: 'root:init', ...expected }),
+    expect.objectContaining({ _e: 'root:update', ...expected }),
+    expect.objectContaining({ _e: 'root:update', version: '3' }),
+  ]);
 });
 
 it('continues recording when metadata persistence fails', async () => {

@@ -15,6 +15,7 @@ import { cleanStaleSessionsSync } from './clean';
 import { getSessionBaseDir } from './discovery';
 import { createDebugSink } from './debug';
 import { eventLogState } from './state';
+import { filterMetadata } from './utils/filterMetadata';
 import { BroadcastChannel } from './utils/broadcastChannel';
 import { LogStream, type EventSink } from './utils/logStream';
 import { ingestIpcSocket, publishChildEnv } from './utils/ipc';
@@ -116,11 +117,10 @@ export function createSession(options: SessionOptions): SessionContext {
   function updateMetadata(patch?: EventLoggerMetadata) {
     if (destroyed) return;
     try {
-      Object.assign(meta.metadata, patch);
-      const metadata: Record<string, unknown> = {};
-      for (const k in meta.metadata) {
-        if (!k.startsWith('_')) metadata[k] = meta.metadata[k];
-      }
+      const merged = Object.assign(Object.create(null), meta.metadata, patch);
+      const metadata = filterMetadata(merged);
+      // Getters can still throw; only commit after filtering succeeds.
+      Object.assign(meta.metadata, merged);
       writeJsonAtomic(path.join(sessionDir, SESSION_FILES.meta), {
         ...meta,
         metadata,

@@ -19,6 +19,7 @@ import {
 } from './utils/ipc';
 import { getProcessWorkerId } from './utils/processOrigin';
 import { redirectConsoleForFd } from './utils/redirectConsole';
+import { filterMetadata } from './utils/filterMetadata';
 
 export type { EventLoggerInfo } from './state';
 
@@ -169,12 +170,18 @@ function createPrimarySink(
 export function updateEventLoggerMetadata(patch: EventLoggerMetadata): void {
   if (!eventLogState.primarySink?.writable) return;
   eventLogState.updateMetadata?.(patch);
-  rootEvent('update', patch);
+  emitMetadata('update', patch);
 }
 
 function activateSink(sink: EventSink, initialMetadata?: EventLoggerMetadata) {
   eventLogState.primarySink = sink;
-  rootEvent('init', initialMetadata);
+  emitMetadata('init', initialMetadata);
+}
+
+function emitMetadata(kind: 'init' | 'update', metadata?: EventLoggerMetadata) {
+  try {
+    rootEvent(kind, filterMetadata(metadata));
+  } catch {}
 }
 
 function connectToParent(options?: InstallEventLoggerOptions): boolean {
