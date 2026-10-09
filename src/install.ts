@@ -115,7 +115,8 @@ export function installEventLogger(
       debug: eventLogState.debug,
       sessionDir: session.sessionDir,
     };
-    activateSink(session.sink, options.metadata, session.updateMetadata);
+    eventLogState.updateMetadata = session.updateMetadata;
+    activateSink(session.sink, options.metadata);
   }
 }
 
@@ -171,13 +172,8 @@ export function updateEventLoggerMetadata(patch: EventLoggerMetadata): void {
   rootEvent('update', patch);
 }
 
-function activateSink(
-  sink: EventSink,
-  initialMetadata?: EventLoggerMetadata,
-  updateMetadata?: (patch: EventLoggerMetadata) => void
-) {
+function activateSink(sink: EventSink, initialMetadata?: EventLoggerMetadata) {
   eventLogState.primarySink = sink;
-  eventLogState.updateMetadata = updateMetadata;
   rootEvent('init', initialMetadata);
 }
 

@@ -48,18 +48,11 @@ export async function runExportCli(args: string[]) {
     events = readJsonlStdin();
   }
 
+  const exportOptions = { ...options, pid: exportPid, command };
   const file =
     options.format === 'opentelemetry'
-      ? await convertToOpenTelemetry(events, {
-          ...options,
-          pid: exportPid,
-          command,
-        })
-      : await convertToChromeTrace(events, {
-          ...options,
-          pid: exportPid,
-          command,
-        });
+      ? await convertToOpenTelemetry(events, exportOptions)
+      : await convertToChromeTrace(events, exportOptions);
   const output = JSON.stringify(file, null, 2);
   if (options.output) fs.writeFileSync(options.output, `${output}\n`);
   else process.stdout.write(`${output}\n`);

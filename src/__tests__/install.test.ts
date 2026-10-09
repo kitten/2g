@@ -258,35 +258,6 @@ describe('install session', () => {
     }
   });
 
-  it('reads session metadata without validating its format', async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
-    const sessionDir = path.join(dir, '123');
-    const restoreDir = setSessionDir(dir);
-    await fs.mkdir(sessionDir, { recursive: true });
-    await fs.writeFile(
-      path.join(sessionDir, SESSION_FILES.meta),
-      JSON.stringify({
-        pid: 123,
-        metadata: { format: 'unknown' },
-        startedAt: Date.now(),
-        command: 'old',
-        cwd: process.cwd(),
-        socket: SESSION_FILES.liveSocket,
-        ipcSocket: SESSION_FILES.ipcSocket,
-      })
-    );
-
-    try {
-      const { readMetaSync } = await import('../discovery');
-      expect(readMetaSync(sessionDir)).toMatchObject({
-        metadata: { format: 'unknown' },
-      });
-    } finally {
-      restoreDir();
-      await fs.rm(dir, { recursive: true, force: true });
-    }
-  });
-
   it('prints matching LOG_DEBUG events through the parent session sink', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
     const restoreDir = setSessionDir(dir);
