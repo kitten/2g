@@ -24,7 +24,7 @@ describe('export command', () => {
     const output = path.join(dir, 'trace.json');
     await fs.writeFile(
       input,
-      `${JSON.stringify({ _e: 'root:init', _t: 900, metadata: { version: '1.0.0' } })}\n`
+      `${JSON.stringify({ _e: 'root:init', _t: 900, version: '1.0.0' })}\n`
     );
 
     try {
@@ -43,7 +43,7 @@ describe('export command', () => {
     const output = path.join(dir, 'otel.json');
     await fs.writeFile(
       input,
-      `${JSON.stringify({ _e: 'root:init', _t: 900, metadata: { version: '1.0.0' } })}\n${JSON.stringify(
+      `${JSON.stringify({ _e: 'root:init', _t: 900, version: '1.0.0' })}\n${JSON.stringify(
         {
           _e: 'metro:bundling:done',
           _t: 1500,
@@ -107,7 +107,7 @@ describe('export command', () => {
       .mockImplementation(() => true);
     await fs.writeFile(
       input,
-      `${JSON.stringify({ _e: 'root:init', _t: 900, metadata: { version: '1.0.0' } })}\n`
+      `${JSON.stringify({ _e: 'root:init', _t: 900, version: '1.0.0' })}\n`
     );
 
     try {
@@ -157,7 +157,7 @@ describe('export command', () => {
         JSON.stringify({
           _e: 'root:metadata',
           _t: 1200,
-          metadata: { version: '2' },
+          version: '2',
         }),
       ].join('\n') + '\n'
     );

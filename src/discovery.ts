@@ -1,11 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {
-  EVENT_LOG_TMP_DIR,
-  EVENT_LOG_FORMAT_VERSION,
-  SESSION_FILES,
-} from './constants';
+import { EVENT_LOG_TMP_DIR, SESSION_FILES } from './constants';
 import type { SessionMeta } from './session';
 
 export interface SessionEntry {
@@ -26,7 +22,7 @@ export function readMetaSync(sessionDir: string): SessionMeta | null {
     const meta = JSON.parse(
       fs.readFileSync(path.join(sessionDir, SESSION_FILES.meta), 'utf8')
     );
-    return isCompatibleSessionMeta(meta) ? meta : null;
+    return meta && typeof meta === 'object' ? meta : null;
   } catch {
     return null;
   }
@@ -99,12 +95,4 @@ export function getSessionEntries() {
   } catch {
     return [];
   }
-}
-
-function isCompatibleSessionMeta(meta: unknown): meta is SessionMeta {
-  return (
-    !!meta &&
-    typeof meta === 'object' &&
-    (meta as SessionMeta).formatVersion === EVENT_LOG_FORMAT_VERSION
-  );
 }

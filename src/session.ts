@@ -8,7 +8,7 @@ import {
   DEBUG_SEGMENT_SIZE,
   DEFAULT_SEGMENTS,
   DEFAULT_SEGMENT_SIZE,
-  EVENT_LOG_FORMAT_VERSION,
+  EVENT_LOG_FORMAT,
   SESSION_FILES,
 } from './constants';
 import { cleanStaleSessionsSync } from './clean';
@@ -34,7 +34,6 @@ export interface SessionOptions {
 
 export interface SessionMeta {
   pid: number;
-  formatVersion: number;
   startedAt: number;
   command: string;
   cwd: string;
@@ -104,7 +103,6 @@ export function createSession(options: SessionOptions): SessionContext {
 
   const meta: SessionMeta = {
     pid: process.pid,
-    formatVersion: EVENT_LOG_FORMAT_VERSION,
     startedAt,
     command: options.command ?? process.argv.slice(1).join(' '),
     cwd: process.cwd(),
@@ -112,13 +110,19 @@ export function createSession(options: SessionOptions): SessionContext {
     socket: liveSocket.name,
     ipcSocket: ipcSocket.name,
     origin: createSessionOrigin(),
+    metadata: Object.assign(Object.create(null), { format: EVENT_LOG_FORMAT }),
   };
   let destroyed = false;
   function updateMetadata(patch?: EventLoggerMetadata) {
     if (destroyed) return;
     try {
       if (patch) Object.assign((meta.metadata ??= Object.create(null)), patch);
-      writeJsonAtomic(path.join(sessionDir, SESSION_FILES.meta), meta);
+      writeJsonAtomic(path.join(sessionDir, SESSION_FILES.meta), {
+        ...meta,
+        metadata: Object.fromEntries(
+          Object.entries(meta.metadata!).filter(([key]) => !key.startsWith('_'))
+        ),
+      });
     } catch {}
   }
   // Without meta.json the session is invisible to tooling; logging still works

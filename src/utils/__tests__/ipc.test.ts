@@ -172,13 +172,11 @@ it('forwards split and batched metadata without parsing events', () => {
   try {
     socket.emit(
       'data',
-      '{"_e":"root:init","_t":1,"metadata":{"port":8081}}\n{"_e":"root:met'
+      '{"_e":"root:init","_t":1,"port":8081}\n{"_e":"root:met'
     );
-    expect(writes).toEqual([
-      '{"_e":"root:init","_t":1,"metadata":{"port":8081}}\n',
-    ]);
+    expect(writes).toEqual(['{"_e":"root:init","_t":1,"port":8081}\n']);
     const tail =
-      'adata","_t":2,"_w":"child","metadata":{"ready":true}}\n{"_e":"root:metadata",broken}\n{"_e":"custom:tick","_t":3,"message":"root:metadata"}\n{"_e":"root:metadata","_t":4,"metadata":{"port":8082}}\n';
+      'adata","_t":2,"_w":"child","ready":true}\n{"_e":"root:metadata",broken}\n{"_e":"custom:tick","_t":3,"message":"root:metadata"}\n{"_e":"root:metadata","_t":4,"port":8082}\n';
     socket.emit('data', tail);
     expect(writes).toHaveLength(2);
     expect(writes[1]).toBe('{"_e":"root:met' + tail);

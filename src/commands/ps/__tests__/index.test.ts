@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { EVENT_LOG_FORMAT_VERSION, SESSION_FILES } from '../../../constants';
+import { SESSION_FILES } from '../../../constants';
 import { _setSessionBaseDir } from '../../../discovery';
 import { runPsCli } from '../index';
 
@@ -144,7 +144,6 @@ async function writeMeta(
     path.join(sessionDir, SESSION_FILES.meta),
     JSON.stringify({
       pid,
-      formatVersion: EVENT_LOG_FORMAT_VERSION,
       startedAt: Date.now(),
       command,
       metadata,

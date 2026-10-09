@@ -119,7 +119,6 @@ describe('captureEvents', () => {
         expect.not.objectContaining({ _w: expect.any(String) }),
         expect.objectContaining({
           _w: child._w,
-          processOrigin: { kind: 'event_log_child', id: String(child.pid) },
         }),
       ]);
     }

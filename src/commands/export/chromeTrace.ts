@@ -95,7 +95,6 @@ export class TraceConverter {
   add(input: ParsedEvent) {
     const event = this.#context.read(input);
     if (!event) return;
-    if (event._e === 'root:init') return;
 
     const parsed = splitEventName(event._e);
     const track = this.#getTrack(

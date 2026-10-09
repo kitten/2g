@@ -8,9 +8,9 @@ import { cleanExitedSessionsSync, cleanStaleSessionsSync } from '../clean';
 import { _setSessionBaseDir, readMetaSync } from '../discovery';
 import { resolveSocketPath } from '../utils/sessionSockets';
 import {
+  EVENT_LOG_FORMAT,
   DEFAULT_MAX_SESSIONS,
   DEFAULT_RETAIN_MS,
-  EVENT_LOG_FORMAT_VERSION,
   SESSION_FILES,
 } from '../constants';
 
@@ -108,7 +108,7 @@ describe('clean', () => {
     );
   });
 
-  it('reads only compatible session metadata', async () => {
+  it('reads session metadata without validating its format', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-clean-'));
     const sessionDir = path.join(dir, '123');
     await fs.mkdir(sessionDir, { recursive: true });
@@ -116,7 +116,7 @@ describe('clean', () => {
       path.join(sessionDir, SESSION_FILES.meta),
       JSON.stringify({
         pid: 123,
-        formatVersion: EVENT_LOG_FORMAT_VERSION + 1,
+        metadata: { format: 'unknown' },
         startedAt: Date.now(),
         command: 'old',
         cwd: process.cwd(),
@@ -127,7 +127,9 @@ describe('clean', () => {
     );
 
     try {
-      expect(readMetaSync(sessionDir)).toBeNull();
+      expect(readMetaSync(sessionDir)).toMatchObject({
+        metadata: { format: 'unknown' },
+      });
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
@@ -145,7 +147,7 @@ async function writeMeta(sessionDir: string, pid: number, startedAt: number) {
     path.join(sessionDir, SESSION_FILES.meta),
     JSON.stringify({
       pid,
-      formatVersion: EVENT_LOG_FORMAT_VERSION,
+      metadata: { format: EVENT_LOG_FORMAT },
       startedAt,
       command: `command-${pid}`,
       cwd: process.cwd(),

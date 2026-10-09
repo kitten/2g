@@ -38,15 +38,13 @@ describe('api', () => {
 
     const { events } = await import('../events');
     events('root')('init', {
-      format: 'v0-jsonl',
-      formatVersion: 1,
-      metadata: { version: 'test' },
+      version: 'test',
     });
 
     expect(lines).toHaveLength(1);
     expect(JSON.parse(lines[0])).toMatchObject({
       _e: 'root:init',
-      metadata: { version: 'test' },
+      version: 'test',
     });
   });
 
@@ -486,7 +484,6 @@ describe('api', () => {
       expect(JSON.parse(received.join('').trim())).toMatchObject({
         _e: 'root:init',
         _w: `event_log_child:${process.pid}`,
-        processOrigin: { kind: 'event_log_child', id: String(process.pid) },
       });
     } finally {
       client?.destroy();
@@ -628,7 +625,6 @@ describe('api', () => {
       await waitFor(() => received.join('').includes('"root:init"'));
       expect(JSON.parse(received.join('').trim())).toMatchObject({
         _w: 'child_process:42',
-        processOrigin: { kind: 'child_process', id: '42' },
       });
     } finally {
       client?.destroy();

@@ -94,8 +94,6 @@ class OpenTelemetryConverter {
         ? eventTime
         : this.#endTimeUnixNano;
 
-    if (event._e === 'root:init') return;
-
     if (typeof event._d === 'number') {
       this.#spans.push(this.#createSpan(event));
     } else {

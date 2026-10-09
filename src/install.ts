@@ -2,11 +2,7 @@ import path from 'node:path';
 
 import type { EventLoggerMetadata } from './types';
 import { events } from './events';
-import {
-  EVENT_LOG_FORMAT_VERSION,
-  LOG_DEBUG_ENV,
-  LOG_EVENTS_ENV,
-} from './constants';
+import { LOG_DEBUG_ENV, LOG_EVENTS_ENV } from './constants';
 import { eventLogState, type EventLoggerInfo } from './state';
 import { createSession, type SessionOptions } from './session';
 import {
@@ -21,7 +17,7 @@ import {
   openIpc,
   publishTempIpcSink,
 } from './utils/ipc';
-import { getProcessOrigin, getProcessWorkerId } from './utils/processOrigin';
+import { getProcessWorkerId } from './utils/processOrigin';
 import { redirectConsoleForFd } from './utils/redirectConsole';
 
 export type { EventLoggerInfo } from './state';
@@ -119,7 +115,7 @@ export function installEventLogger(
       debug: eventLogState.debug,
       sessionDir: session.sessionDir,
     };
-    activateSink(session.sink, session.meta.metadata, session.updateMetadata);
+    activateSink(session.sink, options.metadata, session.updateMetadata);
   }
 }
 
@@ -172,7 +168,7 @@ function createPrimarySink(
 export function updateEventLoggerMetadata(patch: EventLoggerMetadata): void {
   if (!eventLogState.primarySink?.writable) return;
   eventLogState.updateMetadata?.(patch);
-  rootEvent('metadata', { metadata: patch });
+  rootEvent('metadata', patch);
 }
 
 function activateSink(
@@ -182,13 +178,7 @@ function activateSink(
 ) {
   eventLogState.primarySink = sink;
   eventLogState.updateMetadata = updateMetadata;
-  const metadata = {
-    format: 'v0-jsonl',
-    formatVersion: EVENT_LOG_FORMAT_VERSION,
-    metadata: initialMetadata,
-    processOrigin: getProcessOrigin() ?? undefined,
-  };
-  rootEvent('init', metadata);
+  rootEvent('init', initialMetadata);
 }
 
 function connectToParent(options?: InstallEventLoggerOptions): boolean {

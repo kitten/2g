@@ -9,8 +9,8 @@ describe('trace', () => {
         {
           _e: 'root:init',
           _t: 900,
-          format: 'v0-jsonl',
-          metadata: { version: '1.0.0' },
+
+          version: '1.0.0',
         },
         { _e: 'env:mode', _t: 1000, mode: 'development' },
         { _e: 'metro:bundling:done', _t: 1500, _d: 250.25, id: 'a' },
@@ -139,14 +139,12 @@ describe('trace', () => {
         _e: 'root:init',
         _t: 950,
         _w: 'worker_thread:1',
-        metadata: {},
       },
-      { _e: 'root:init', _t: 900, metadata: { version: '1.0.0' } },
+      { _e: 'root:init', _t: 900, version: '1.0.0' },
       {
         _e: 'root:init',
         _t: 975,
         _w: 'event_log_child:2',
-        metadata: {},
       },
       { _e: 'env:mode', _t: 1000 },
     ]);

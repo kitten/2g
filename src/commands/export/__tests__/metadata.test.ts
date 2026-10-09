@@ -4,19 +4,20 @@ import { convertToOpenTelemetry } from '../opentelemetry';
 import type { ExportOptions } from '../context';
 
 const events = [
-  { _e: 'root:init', _t: 1000, metadata: { version: '1', port: 8081 } },
-  { _e: 'root:metadata', _t: 1050, metadata: { version: '2' } },
+  { _e: 'root:init', _t: 1000, version: '1', port: 8081 },
+  { _e: 'root:metadata', _t: 1050, version: '2' },
   {
     _e: 'root:metadata',
     _t: 1100,
     _w: 'child:1',
-    metadata: { version: 'child', ready: true },
+    version: 'child',
+    ready: true,
   },
   {
     _e: 'root:init',
     _t: 1150,
     _w: 'child:2',
-    metadata: { version: 'child-init' },
+    version: 'child-init',
   },
   { _e: 'app:done', _t: 1300, _d: 100 },
 ];
@@ -56,10 +57,10 @@ describe('export metadata', () => {
     });
     const points = trace.traceEvents.filter(event => event.ph === 'i');
     expect(points.map(event => event.args)).toEqual([
-      { metadata: { version: '1', port: 8081 } },
-      { metadata: { version: '2' } },
-      { metadata: { version: 'child', ready: true } },
-      { metadata: { version: 'child-init' } },
+      { version: '1', port: 8081 },
+      { version: '2' },
+      { version: 'child', ready: true },
+      { version: 'child-init' },
     ]);
     expect(
       trace.traceEvents.find(event => event.name === 'process_name')?.args
@@ -76,15 +77,15 @@ describe('export metadata', () => {
     expect(otel.resourceSpans[0].scopeSpans[0].spans[0].name).toBe('explicit');
     expect(otel.resourceSpans[0].scopeSpans[0].spans[0].events).toHaveLength(4);
   });
-  it('does not recover missing version from legacy or incomplete input', async () => {
+  it('does not recover missing version from child metadata', async () => {
     const incomplete = [
-      { _e: 'root:init', _t: 1, version: 'legacy' },
-      { _e: 'root:metadata', _t: 2, metadata: { port: 8081 } },
+      { _e: 'root:init', _t: 1 },
+      { _e: 'root:metadata', _t: 2, port: 8081 },
       {
         _e: 'root:metadata',
         _t: 3,
         _w: 'child',
-        metadata: { version: 'child' },
+        version: 'child',
       },
     ];
     const trace = await convertToChromeTrace(incomplete);

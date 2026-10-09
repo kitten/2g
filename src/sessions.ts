@@ -14,7 +14,6 @@ import type { EventLoggerMetadata } from './types';
 export interface ListedSession {
   id: string;
   pid: number;
-  formatVersion: number;
   alive: boolean;
   startedAt: number;
   command: string;
@@ -46,7 +45,6 @@ export async function listSessions(
     sessions.push({
       id: entry.name,
       pid: meta.pid,
-      formatVersion: meta.formatVersion,
       alive: false,
       startedAt: meta.startedAt,
       command: meta.command,

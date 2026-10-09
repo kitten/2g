@@ -6,11 +6,11 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  EVENT_LOG_FORMAT,
   DEBUG_SEGMENTS,
   DEFAULT_SEGMENTS,
   DEFAULT_SEGMENT_SIZE,
   DEFAULT_RETAIN_MS,
-  EVENT_LOG_FORMAT_VERSION,
   EVENT_LOG_TMP_DIR,
   INTERNAL_DEBUG_ENV,
   INTERNAL_IPC_ENV,
@@ -93,9 +93,8 @@ describe('install session', () => {
       expect(meta).toMatchObject({
         command: 'test command',
         cwd: process.cwd(),
-        formatVersion: EVENT_LOG_FORMAT_VERSION,
         maxSegments: 3,
-        metadata: { version: '1.2.3' },
+        metadata: { format: EVENT_LOG_FORMAT, version: '1.2.3' },
         socket:
           process.platform === 'win32' ? pipeName : SESSION_FILES.liveSocket,
         ipcSocket:
@@ -225,7 +224,7 @@ describe('install session', () => {
       path.join(staleDir, SESSION_FILES.meta),
       JSON.stringify({
         pid: 9_999_999,
-        formatVersion: EVENT_LOG_FORMAT_VERSION,
+        metadata: { format: EVENT_LOG_FORMAT },
         startedAt: Date.now() - DEFAULT_RETAIN_MS - 1_000,
         command: 'stale',
         cwd: process.cwd(),
@@ -259,7 +258,7 @@ describe('install session', () => {
     }
   });
 
-  it('ignores incompatible session metadata', async () => {
+  it('reads session metadata without validating its format', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
     const sessionDir = path.join(dir, '123');
     const restoreDir = setSessionDir(dir);
@@ -268,7 +267,7 @@ describe('install session', () => {
       path.join(sessionDir, SESSION_FILES.meta),
       JSON.stringify({
         pid: 123,
-        formatVersion: EVENT_LOG_FORMAT_VERSION + 1,
+        metadata: { format: 'unknown' },
         startedAt: Date.now(),
         command: 'old',
         cwd: process.cwd(),
@@ -279,7 +278,9 @@ describe('install session', () => {
 
     try {
       const { readMetaSync } = await import('../discovery');
-      expect(readMetaSync(sessionDir)).toBeNull();
+      expect(readMetaSync(sessionDir)).toMatchObject({
+        metadata: { format: 'unknown' },
+      });
     } finally {
       restoreDir();
       await fs.rm(dir, { recursive: true, force: true });
@@ -436,10 +437,8 @@ describe('install explicit file target', () => {
             _e: 'root:init',
           }),
         ]);
-        expect(lines[0].metadata).toEqual(
-          version == null ? undefined : { version }
-        );
-        expect(lines[0]).not.toHaveProperty('version');
+        expect(lines[0].version).toBe(version);
+        expect(lines[0]).not.toHaveProperty('metadata');
       } finally {
         const sink = eventLogState.primarySink as LogStream | undefined;
         const closed =
