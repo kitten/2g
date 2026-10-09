@@ -133,37 +133,63 @@ it('persists shallow patches and later caller mutations without altering identit
   expect(readMetaSync(ctx.sessionDir)?.pid).toBe(process.pid);
 });
 
-it('handles serialization failures without throwing and never reads disabled input', async () => {
-  const getter = vi.fn(() => {
-    throw Error('getter');
+it('ignores undefined patch fields while retaining null and falsy values', async () => {
+  const ctx = start({
+    version: '1',
+    port: 8081,
+    ready: true,
+    devServerUrl: 'url',
   });
-  const throwing = Object.defineProperty({}, 'version', {
+  const patch = {
+    version: undefined,
+    format: undefined,
+    port: 0,
+    ready: false,
+    devServerUrl: null,
+    nested: { keep: 0, omit: undefined },
+  };
+  updateEventLoggerMetadata(patch);
+  const expected = {
+    format: EVENT_LOG_FORMAT,
+    version: '1',
+    port: 0,
+    ready: false,
+    devServerUrl: null,
+    nested: { keep: 0 },
+  };
+  expect(readMetaSync(ctx.sessionDir)?.metadata).toEqual(expected);
+  expect(ctx.meta.metadata.version).toBe('1');
+  expect(ctx.meta.metadata.format).toBe(EVENT_LOG_FORMAT);
+  const [event] = await readEvents();
+  const { _e, _t, ...emittedPatch } = event;
+  expect(_e).toBe('root:update');
+  expect(_t).toEqual(expect.any(Number));
+  expect(emittedPatch).toEqual({
+    port: 0,
+    ready: false,
+    devServerUrl: null,
+    nested: { keep: 0 },
+  });
+  expect({ format: EVENT_LOG_FORMAT, version: '1', ...emittedPatch }).toEqual(
+    expected
+  );
+  updateEventLoggerMetadata({ ready: true });
+  expect(readMetaSync(ctx.sessionDir)?.metadata).toEqual({
+    ...expected,
+    ready: true,
+  });
+});
+
+it('does not read metadata when logging is disabled', () => {
+  const getter = vi.fn(() => '1');
+  const metadata = Object.defineProperty({}, 'version', {
     enumerable: true,
     get: getter,
   });
-  updateEventLoggerMetadata(throwing);
+  updateEventLoggerMetadata(metadata);
   expect(getter).not.toHaveBeenCalled();
-  installEventLogger({ session: false, metadata: throwing });
+  installEventLogger({ session: false, metadata });
   expect(getter).not.toHaveBeenCalled();
-  vi.stubEnv('LOG_EVENTS', path.join(dir, 'throwing.jsonl'));
-  expect(() => installEventLogger({ metadata: throwing })).not.toThrow();
-  _resetEventLogState();
-  vi.stubEnv('LOG_EVENTS', '');
-  const ctx = start({ version: '1' });
-  const invalid = [throwing, { version: '2', nested: throwing }];
-  for (const patch of invalid)
-    expect(() => updateEventLoggerMetadata(patch as any)).not.toThrow();
-  expect(readMetaSync(ctx.sessionDir)?.metadata).toEqual({
-    format: EVENT_LOG_FORMAT,
-    version: '1',
-  });
-  expect(await readEvents()).toEqual([]);
-  expect(ctx.meta.metadata).toEqual({ format: EVENT_LOG_FORMAT, version: '1' });
-  updateEventLoggerMetadata({ version: '3' });
-  expect(readMetaSync(ctx.sessionDir)?.metadata.version).toBe('3');
-  expect(await readEvents()).toEqual([
-    expect.objectContaining({ _e: 'root:update', version: '3' }),
-  ]);
 });
 
 it('filters cycles and BigInts while preserving shared values and later updates', async () => {

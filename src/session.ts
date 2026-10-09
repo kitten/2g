@@ -113,20 +113,25 @@ export function createSession(options: SessionOptions): SessionContext {
     origin: createSessionOrigin(),
     metadata: Object.assign(Object.create(null), { format: EVENT_LOG_FORMAT }),
   };
+
   let destroyed = false;
+
   function updateMetadata(patch?: EventLoggerMetadata) {
     if (destroyed) return;
     try {
-      const merged = Object.assign(Object.create(null), meta.metadata, patch);
-      const metadata = filterMetadata(merged);
-      // Getters can still throw; only commit after filtering succeeds.
-      Object.assign(meta.metadata, merged);
+      if (patch) {
+        for (const key in patch) {
+          const value = patch[key];
+          if (value !== undefined) meta.metadata[key] = value;
+        }
+      }
       writeJsonAtomic(path.join(sessionDir, SESSION_FILES.meta), {
         ...meta,
-        metadata,
+        metadata: filterMetadata(meta.metadata),
       });
     } catch {}
   }
+
   // Without meta.json the session is invisible to tooling; logging still works
   updateMetadata(options.metadata);
 

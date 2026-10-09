@@ -152,6 +152,7 @@ updateEventLoggerMetadata({ ready: true });
 
 Both calls accept partial, JSON-compatible metadata. Updates merge shallowly:
 supplied keys replace previous values, including nested objects and arrays.
+Top-level `undefined` values are ignored, leaving existing values unchanged.
 
 Initial values emit `root:init`; later patches emit `root:update`. Sessions persist
 their own metadata in `meta.json`, visible through `ps` and `list()`. Child updates
