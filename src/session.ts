@@ -38,7 +38,7 @@ export interface SessionMeta {
   command: string;
   cwd: string;
   maxSegments: number;
-  metadata?: EventLoggerMetadata;
+  metadata: EventLoggerMetadata;
   // Relative to meta.json, or a Windows named-pipe name
   socket: string;
   ipcSocket: string;
@@ -116,12 +116,14 @@ export function createSession(options: SessionOptions): SessionContext {
   function updateMetadata(patch?: EventLoggerMetadata) {
     if (destroyed) return;
     try {
-      if (patch) Object.assign((meta.metadata ??= Object.create(null)), patch);
+      Object.assign(meta.metadata, patch);
+      const metadata: Record<string, unknown> = {};
+      for (const k in meta.metadata) {
+        if (!k.startsWith('_')) metadata[k] = meta.metadata[k];
+      }
       writeJsonAtomic(path.join(sessionDir, SESSION_FILES.meta), {
         ...meta,
-        metadata: Object.fromEntries(
-          Object.entries(meta.metadata!).filter(([key]) => !key.startsWith('_'))
-        ),
+        metadata,
       });
     } catch {}
   }

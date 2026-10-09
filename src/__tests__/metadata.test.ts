@@ -79,7 +79,7 @@ it('initializes metadata in the session and root:init exactly once', async () =>
 
 it('persists shallow patches and later caller mutations without altering identity', async () => {
   const ctx = start(JSON.parse('{"version":"1","__proto__":{"custom":true}}'));
-  const metadata = ctx.meta.metadata!;
+  const metadata = ctx.meta.metadata;
   const event = { _e: 'root:update', _t: 1, _private: true, port: 8080 };
   ctx.updateMetadata(event);
   expect(metadata).toMatchObject(event);

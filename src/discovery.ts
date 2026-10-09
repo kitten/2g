@@ -22,7 +22,9 @@ export function readMetaSync(sessionDir: string): SessionMeta | null {
     const meta = JSON.parse(
       fs.readFileSync(path.join(sessionDir, SESSION_FILES.meta), 'utf8')
     );
-    return meta && typeof meta === 'object' ? meta : null;
+    if (!meta || typeof meta !== 'object') return null;
+    meta.metadata ??= {};
+    return meta;
   } catch {
     return null;
   }

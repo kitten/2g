@@ -49,7 +49,7 @@ export async function listSessions(
       startedAt: meta.startedAt,
       command: meta.command,
       cwd: meta.cwd,
-      metadata: meta.metadata ?? {},
+      metadata: meta.metadata,
       origin: meta.origin,
       sessionDir,
     });
