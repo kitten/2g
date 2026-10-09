@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { convertToChromeTrace } from '../chromeTrace';
+import { convertToChromeTrace, TraceConverter } from '../chromeTrace';
 
 describe('trace', () => {
   it('maps metadata, instants, spans, and workers to Chrome trace events', async () => {
@@ -209,5 +209,39 @@ describe('trace', () => {
     const first = await convertToChromeTrace(events);
     const second = await convertToChromeTrace(events);
     expect(second.traceEvents).toEqual(first.traceEvents);
+  });
+
+  it('preserves input order and recomputes lanes when exporting again', () => {
+    const converter = new TraceConverter();
+    converter.add({ _e: 'build:b:done', _t: 150, _d: 100 });
+    converter.add({ _e: 'env:mode', _t: 90 });
+    converter.add({ _e: 'build:a:done', _t: 100, _d: 100 });
+
+    const first = converter.toTraceFile();
+    expect(converter.toTraceFile().traceEvents).toEqual(first.traceEvents);
+    expect(
+      first.traceEvents
+        .filter(event => event.ph !== 'M')
+        .map(event => [event.name, event.tid])
+    ).toEqual([
+      ['b', 2],
+      ['mode', 3],
+      ['a', 1],
+    ]);
+
+    converter.add({ _e: 'build:c:done', _t: 175, _d: 100 });
+    converter.add({ _e: 'build:progress', _t: 180 });
+    expect(
+      converter
+        .toTraceFile()
+        .traceEvents.filter(event => event.ph !== 'M')
+        .map(event => [event.name, event.tid])
+    ).toEqual([
+      ['b', 2],
+      ['mode', 4],
+      ['a', 1],
+      ['c', 3],
+      ['progress', 1],
+    ]);
   });
 });
