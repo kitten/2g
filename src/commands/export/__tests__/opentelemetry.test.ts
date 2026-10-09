@@ -3,6 +3,60 @@ import { describe, expect, it, vi } from 'vitest';
 import { convertToOpenTelemetry } from '../opentelemetry';
 
 describe('opentelemetry', () => {
+  it('preserves attribute order and nested values while omitting unsupported values', async () => {
+    const nested = Object.assign(Object.create({ inherited: 'ignored' }), {
+      label: 'kept',
+      missing: undefined,
+    });
+    const values = ['text', 0, false, null, Infinity, [1.5, undefined], nested];
+    values.length += 1; // A sparse slot must not become an exported value.
+    const output = await convertToOpenTelemetry(
+      [
+        {
+          _e: 'build:step:done',
+          _t: 100,
+          _d: 10,
+          _l: 1,
+          _w: 'worker:1',
+          empty: '',
+          values,
+          missing: undefined,
+          invalid: NaN,
+          bigint: 1n,
+          _custom: 'retained',
+        },
+      ],
+      { debug: true }
+    );
+    const span = output.resourceSpans[0].scopeSpans[0].spans[1];
+    expect(span.attributes).toEqual([
+      { key: 'event.name', value: { stringValue: 'build:step:done' } },
+      { key: 'event.category', value: { stringValue: 'build' } },
+      { key: 'event.action', value: { stringValue: 'step:done' } },
+      { key: 'event.worker.id', value: { stringValue: 'worker:1' } },
+      { key: 'event_log.empty', value: { stringValue: '' } },
+      {
+        key: 'event_log.values',
+        value: {
+          arrayValue: {
+            values: [
+              { stringValue: 'text' },
+              { intValue: '0' },
+              { boolValue: false },
+              { arrayValue: { values: [{ doubleValue: 1.5 }] } },
+              {
+                kvlistValue: {
+                  values: [{ key: 'label', value: { stringValue: 'kept' } }],
+                },
+              },
+            ],
+          },
+        },
+      },
+      { key: 'event_log._custom', value: { stringValue: 'retained' } },
+    ]);
+  });
+
   it('preserves rounded nanoseconds for fractional Unix timestamps', async () => {
     const output = await convertToOpenTelemetry([
       { _e: 'build:point', _t: 1_700_000_000_000.625 },

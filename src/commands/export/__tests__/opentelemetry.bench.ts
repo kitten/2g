@@ -12,6 +12,11 @@ const spans = instants.map(event => ({
   _e: 'build:done',
   _d: 0.25,
 }));
+const arrays = instants.map(event => ({
+  ...event,
+  samples: Array.from({ length: 32 }, (_, index) => index / 2),
+  tags: ['build', 'cached', null],
+}));
 
 describe('OpenTelemetry export (1000 events)', () => {
   bench('instants', async () => {
@@ -20,5 +25,9 @@ describe('OpenTelemetry export (1000 events)', () => {
 
   bench('spans', async () => {
     await convertToOpenTelemetry(spans);
+  });
+
+  bench('array payloads', async () => {
+    await convertToOpenTelemetry(arrays);
   });
 });
