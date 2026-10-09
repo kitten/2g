@@ -70,8 +70,8 @@ class OpenTelemetryConverter {
   readonly #spans: OpenTelemetrySpan[] = [];
   readonly #events: OpenTelemetrySpanEvent[] = [];
   #context: ExportContext;
-  #startTimeUnixNano: string | undefined;
-  #endTimeUnixNano: string | undefined;
+  #startTimeUnixNano: bigint | undefined;
+  #endTimeUnixNano: bigint | undefined;
 
   constructor(private readonly options: ConvertToOpenTelemetryOptions) {
     this.#context = new ExportContext(options);
@@ -84,20 +84,18 @@ class OpenTelemetryConverter {
     const startTime =
       typeof event._d === 'number' ? unixNano(event._t - event._d) : eventTime;
     this.#startTimeUnixNano =
-      this.#startTimeUnixNano == null ||
-      BigInt(startTime) < BigInt(this.#startTimeUnixNano)
+      this.#startTimeUnixNano == null || startTime < this.#startTimeUnixNano
         ? startTime
         : this.#startTimeUnixNano;
     this.#endTimeUnixNano =
-      this.#endTimeUnixNano == null ||
-      BigInt(eventTime) > BigInt(this.#endTimeUnixNano)
+      this.#endTimeUnixNano == null || eventTime > this.#endTimeUnixNano
         ? eventTime
         : this.#endTimeUnixNano;
 
     if (typeof event._d === 'number') {
-      this.#spans.push(this.#createSpan(event));
+      this.#spans.push(this.#createSpan(event, startTime, eventTime));
     } else {
-      this.#events.push(this.#createEvent(event));
+      this.#events.push(this.#createEvent(event, eventTime));
     }
   }
 
@@ -124,8 +122,8 @@ class OpenTelemetryConverter {
                   traceId: this.#traceId,
                   spanId: this.#sessionSpanId,
                   name: this.#context.processName,
-                  startTimeUnixNano,
-                  endTimeUnixNano,
+                  startTimeUnixNano: String(startTimeUnixNano),
+                  endTimeUnixNano: String(endTimeUnixNano),
                   attributes: attributes({
                     'event_log.kind': 'session',
                   }),
@@ -140,25 +138,27 @@ class OpenTelemetryConverter {
     };
   }
 
-  #createSpan(event: ParsedEvent): OpenTelemetrySpan {
+  #createSpan(
+    event: ParsedEvent,
+    startTime: bigint,
+    endTime: bigint
+  ): OpenTelemetrySpan {
     const parsed = splitEventName(event._e);
-    const startTimeUnixNano = unixNano(event._t - event._d!);
-    const endTimeUnixNano = unixNano(event._t);
     return {
       traceId: this.#traceId,
       spanId: createSpanId(),
       parentSpanId: this.#sessionSpanId,
       name: parsed ? stripSuffix(parsed.name) : event._e,
-      startTimeUnixNano,
-      endTimeUnixNano,
+      startTimeUnixNano: String(startTime),
+      endTimeUnixNano: String(endTime),
       attributes: eventAttributes(event, parsed),
     };
   }
 
-  #createEvent(event: ParsedEvent): OpenTelemetrySpanEvent {
+  #createEvent(event: ParsedEvent, eventTime: bigint): OpenTelemetrySpanEvent {
     const parsed = splitEventName(event._e);
     return {
-      timeUnixNano: unixNano(event._t),
+      timeUnixNano: String(eventTime),
       name: parsed ? stripSuffix(parsed.name) : event._e,
       attributes: eventAttributes(event, parsed),
     };
@@ -236,7 +236,7 @@ function createSpanId() {
 }
 
 function unixNano(timeMs: number) {
-  return String(BigInt(Math.round(timeMs * 1_000_000)));
+  return BigInt(Math.round(timeMs * 1_000_000));
 }
 
 function splitEventName(value: string) {

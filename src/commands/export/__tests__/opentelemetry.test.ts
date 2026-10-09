@@ -1,8 +1,48 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { convertToOpenTelemetry } from '../opentelemetry';
 
 describe('opentelemetry', () => {
+  it('preserves rounded nanoseconds for fractional Unix timestamps', async () => {
+    const output = await convertToOpenTelemetry([
+      { _e: 'build:point', _t: 1_700_000_000_000.625 },
+      { _e: 'build:done', _t: 1_700_000_000_000.375, _d: 0.25 },
+    ]);
+    const [parent, child] = output.resourceSpans[0].scopeSpans[0].spans;
+    expect(parent.startTimeUnixNano).toBe('1700000000000124928');
+    expect(parent.endTimeUnixNano).toBe('1700000000000624896');
+    expect(child.startTimeUnixNano).toBe(parent.startTimeUnixNano);
+    expect(child.endTimeUnixNano).toBe('1700000000000375040');
+    expect(parent.events?.[0].timeUnixNano).toBe(parent.endTimeUnixNano);
+    expect(() => JSON.stringify(output)).not.toThrow();
+  });
+
+  it('rounds sub-nanosecond and negative timestamps', async () => {
+    const output = await convertToOpenTelemetry([
+      { _e: 'build:point', _t: 0.0000005 },
+      { _e: 'build:done', _t: -0.0000005, _d: 0.000001 },
+    ]);
+    const [parent, child] = output.resourceSpans[0].scopeSpans[0].spans;
+    expect(parent.startTimeUnixNano).toBe('-1');
+    expect(parent.endTimeUnixNano).toBe('1');
+    expect(child.startTimeUnixNano).toBe('-1');
+    expect(child.endTimeUnixNano).toBe('0');
+    expect(parent.events?.[0].timeUnixNano).toBe('1');
+  });
+
+  it('uses the current time for an empty export', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1234);
+    try {
+      const output = await convertToOpenTelemetry([]);
+      expect(output.resourceSpans[0].scopeSpans[0].spans[0]).toMatchObject({
+        startTimeUnixNano: '1234000000',
+        endTimeUnixNano: '1234000000',
+      });
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('does not replace supplied version with empty child metadata', async () => {
     const output = await convertToOpenTelemetry([
       {
