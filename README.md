@@ -50,7 +50,10 @@ Install logging once when a CLI command starts, then create loggers in any packa
 ```ts
 import { installEventLogger, events } from '2g';
 
-installEventLogger({ command: 'expo start -p web', version: '1.0.0' });
+installEventLogger({
+  command: 'expo start -p web',
+  metadata: { version: '1.0.0' },
+});
 
 const log = events('metro');
 
@@ -122,6 +125,51 @@ printed, not which debug events are recorded:
 LOG_DEBUG=metro:* expo start
 LOG_DEBUG=* expo export
 ```
+
+### Changing session metadata
+
+Declare the application metadata you expect, then supply it at installation or as
+values become known:
+
+```ts
+import { installEventLogger, updateEventLoggerMetadata } from '2g';
+
+declare module '2g' {
+  interface MetadataRegistry {
+    port: number;
+    ready: boolean;
+    devServerUrl: string | null;
+  }
+}
+
+installEventLogger({ metadata: { version: '1.0.0', ready: false } });
+updateEventLoggerMetadata({
+  port: 8081,
+  devServerUrl: 'http://localhost:8081',
+});
+updateEventLoggerMetadata({ ready: true });
+```
+
+Both inputs are shallow partials of `MetadataRegistry`, defaulting to `{}`.
+Updates replace supplied keys; nested objects and arrays replace wholesale.
+Values must be JSON-compatible, with `null` allowed where declared and undefined
+omitted on serialization. Later writes may persist caller mutations to held objects.
+
+Initial values appear in `root:init.metadata`; updates emit `root:metadata` with
+`{ metadata: patch }`. Local updates atomically rewrite the session's `meta.json`.
+`ps` shows a JSON `METADATA` column; `ps --json` and `list()` expose `metadata`.
+Children only forward events; explicit destinations create no session or sidecar.
+Disabled logging ignores updates, and serialization or file errors never throw
+into the application. Readers may see the last successfully persisted state.
+
+For children already attached on import, use the update API: installation remains
+install-once. Types guide producers; consumers should prefilter sessions before
+interpreting their metadata. Event envelope keys remain excluded by the type.
+
+`metadata.version` replaces the top-level version option and init/session fields,
+without a default or legacy fallback. Exports derive version from the root process's
+recorded metadata, not child events or today's `meta.json`; rotated or filtered
+input may have incomplete metadata.
 
 ### Deferred payload helpers
 
@@ -251,7 +299,7 @@ are optional:
 | Option           | Default | Description                                                                                                       |
 | ---------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
 | `command`        | argv    | Command line recorded in session metadata                                                                         |
-| `version`        | —       | Tool version recorded in session metadata and the init event                                                      |
+| `metadata`       | `{}`    | Initial application metadata, including optional `version`, recorded in the session and init event                |
 | `maxSegments`    | `3`     | Rotated JSONL segments kept per session                                                                           |
 | `maxSegmentSize` | 512 KiB | Segment size that triggers rotation                                                                               |
 | `session`        | `true`  | Allow the session fall-through; `false` keeps env-only activation                                                 |
