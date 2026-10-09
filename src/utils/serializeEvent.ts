@@ -61,8 +61,7 @@ export function writeCompleteEvent(
   dest: EventSink,
   category: string,
   kind: string,
-  startPayload: Record<string, unknown> | undefined,
-  endPayload: Record<string, unknown> | undefined,
+  payload: Record<string, unknown> | undefined,
   delta: number,
   meta?: EventMeta,
   level?: number
@@ -71,7 +70,7 @@ export function writeCompleteEvent(
     let line = `{"_e":"${category}:${kind}","_t":${stringifyTimestamp()},"_d":${delta}`;
     if (level) line += `,"_l":${level}`;
     if (meta?._w) line += `,"_w":${stringifyWorkerId(meta._w)}`;
-    dest._writeln(`${appendMergedPayload(line, startPayload, endPayload)}}\n`);
+    dest._writeln(`${appendPayload(line, payload)}}\n`);
   } catch {}
 }
 
@@ -101,14 +100,4 @@ function appendPayload(line: string, payload?: Record<string, unknown>) {
   if (!payload) return line;
   const rest = JSON.stringify(payload);
   return rest && rest.length > 2 ? `${line},${rest.slice(1, -1)}` : line;
-}
-
-function appendMergedPayload(
-  line: string,
-  startPayload?: Record<string, unknown>,
-  endPayload?: Record<string, unknown>
-) {
-  if (!startPayload) return appendPayload(line, endPayload);
-  if (!endPayload) return appendPayload(line, startPayload);
-  return appendPayload(line, Object.assign(startPayload, endPayload));
 }
