@@ -88,7 +88,8 @@ async function writeMeta(sessionDir: string, pid: number) {
     path.join(sessionDir, SESSION_FILES.meta),
     JSON.stringify({
       pid,
-      metadata: { format: EVENT_LOG_FORMAT },
+      format: EVENT_LOG_FORMAT,
+      metadata: {},
       startedAt: Date.now(),
       command: 'clean test',
       cwd: process.cwd(),

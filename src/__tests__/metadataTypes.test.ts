@@ -49,6 +49,9 @@ function checkMetadataTypes() {
 
 it('shares augmented partial metadata with the public listing API', () => {
   expectTypeOf<ApiMetadata>().toEqualTypeOf<EventLoggerMetadata>();
+  expectTypeOf<
+    Extract<keyof EventLoggerMetadata, 'format'>
+  >().toEqualTypeOf<never>();
   expectTypeOf<ListedSession['metadata']['port']>().toEqualTypeOf<
     number | undefined
   >();

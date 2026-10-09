@@ -34,6 +34,7 @@ export interface SessionOptions {
 }
 
 export interface SessionMeta {
+  format: typeof EVENT_LOG_FORMAT;
   pid: number;
   startedAt: number;
   command: string;
@@ -103,6 +104,7 @@ export function createSession(options: SessionOptions): SessionContext {
   const clearChildEnvironment = publishChildEnv(ipcSocket.path);
 
   const meta: SessionMeta = {
+    format: EVENT_LOG_FORMAT,
     pid: process.pid,
     startedAt,
     command: options.command ?? process.argv.slice(1).join(' '),
@@ -111,7 +113,7 @@ export function createSession(options: SessionOptions): SessionContext {
     socket: liveSocket.name,
     ipcSocket: ipcSocket.name,
     origin: createSessionOrigin(),
-    metadata: Object.assign(Object.create(null), { format: EVENT_LOG_FORMAT }),
+    metadata: Object.create(null),
   };
 
   let destroyed = false;

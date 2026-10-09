@@ -7,6 +7,61 @@ import { describe, expect, it, vi } from 'vitest';
 import { runRecordCli } from '../index';
 
 describe('record command', () => {
+  it.each(['chrome-trace', 'opentelemetry'])(
+    'preserves the latest parent version when filtering %s recordings',
+    async format => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-record-'));
+      const output = path.join(dir, 'trace.json');
+      const events = [
+        { _e: 'root:init', _t: 1, version: '1' },
+        { _e: 'root:update', _t: 2, version: '2' },
+        { _e: 'root:init', _t: 3, _w: 'child:1', version: 'child' },
+        { _e: 'other:done', _t: 4 },
+        { _e: 'build:bundle', _t: 5, _d: 1 },
+      ];
+      const script = `require('node:fs').writeSync(3, ${JSON.stringify(
+        events.map(event => JSON.stringify(event) + '\n').join('')
+      )});`;
+
+      try {
+        await runRecordCli([
+          '--format',
+          format,
+          '--filter',
+          'build',
+          '-o',
+          output,
+          '--',
+          process.execPath,
+          '-e',
+          script,
+        ]);
+        const trace = JSON.parse(await fs.readFile(output, 'utf8'));
+        if (format === 'chrome-trace') {
+          expect(trace.metadata.version).toBe('2');
+          expect(trace.traceEvents.filter(event => event.ph !== 'M')).toEqual([
+            expect.objectContaining({ name: 'bundle', cat: 'build' }),
+          ]);
+        } else {
+          const resource = trace.resourceSpans[0];
+          expect(resource.resource.attributes).toContainEqual({
+            key: 'service.version',
+            value: { stringValue: '2' },
+          });
+          const spans = resource.scopeSpans[0].spans;
+          expect(spans).toHaveLength(2);
+          expect(spans[0].events).toBeUndefined();
+          expect(spans[1].attributes).toContainEqual({
+            key: 'event.name',
+            value: { stringValue: 'build:bundle' },
+          });
+        }
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('runs a command and traces the events it emits to a file', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-record-'));
     const output = path.join(dir, 'trace.json');

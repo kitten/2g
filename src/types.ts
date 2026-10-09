@@ -1,5 +1,3 @@
-import type { EVENT_LOG_FORMAT } from './constants';
-
 type Prettify<T> =
   T extends Record<string, unknown> ? { [K in keyof T]: T[K] } : T;
 
@@ -31,7 +29,6 @@ type ValidPayload<Payload> =
     : never;
 
 export interface MetadataRegistry {
-  format?: typeof EVENT_LOG_FORMAT;
   version?: string;
 }
 

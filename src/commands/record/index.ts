@@ -33,10 +33,8 @@ export async function runRecordCli(args: string[]) {
 
   if (options.json) redirectConsoleToStderr();
 
-  const capture = captureEvents({
-    debug: options.debug,
-    filter: options.filter,
-  });
+  // Converters read version metadata before applying the event-name filter.
+  const capture = captureEvents({ debug: options.debug });
   // The trace lands on stdout when there is no -o, so route the child's stdout
   // to stderr to keep it clean; with -o the child can use stdout normally.
   const child = spawn(
