@@ -1,11 +1,13 @@
+import syncFs from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { cleanExitedSessionsSync, cleanStaleSessionsSync } from '../clean';
 import { _setSessionBaseDir, readMetaSync } from '../discovery';
+import { listSessions } from '../sessions';
 import { resolveSocketPath } from '../utils/sessionSockets';
 import {
   EVENT_LOG_FORMAT,
@@ -15,6 +17,52 @@ import {
 } from '../constants';
 
 describe('clean', () => {
+  it('lists retained sessions using one discovery snapshot', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-list-'));
+    const restoreDir = setSessionDir(dir);
+    const old = Date.now() - DEFAULT_RETAIN_MS - 1_000;
+    const recent = Date.now();
+    await writeMeta(path.join(dir, 'old-dead'), 9_999_999, old);
+    await writeMeta(path.join(dir, 'recent-dead'), 9_999_998, recent);
+    await writeMeta(path.join(dir, 'gen-old'), process.pid, old);
+    await writeMeta(path.join(dir, 'gen-new'), process.pid, recent + 1);
+    const readdirSync = vi.spyOn(syncFs, 'readdirSync');
+    const readdir = vi.spyOn(fs, 'readdir');
+    const readFile = vi.spyOn(syncFs, 'readFileSync');
+    const kill = vi.spyOn(process, 'kill');
+
+    try {
+      const sessions = await listSessions();
+      expect(
+        readdirSync.mock.calls.filter(([directory]) => directory === dir)
+      ).toHaveLength(1);
+      expect(readdir).not.toHaveBeenCalled();
+      expect(readFile).toHaveBeenCalledTimes(4);
+      expect(kill).toHaveBeenCalledTimes(2);
+      expect(kill.mock.calls).toEqual(
+        expect.arrayContaining([
+          [9_999_999, 0],
+          [9_999_998, 0],
+        ])
+      );
+      expect(sessions.map(({ id, alive }) => ({ id, alive }))).toEqual([
+        { id: 'gen-new', alive: true },
+        { id: 'recent-dead', alive: false },
+      ]);
+      expect(await exists(path.join(dir, 'old-dead'))).toBe(false);
+      expect(await exists(path.join(dir, 'gen-old'))).toBe(false);
+      expect(await exists(path.join(dir, 'gen-new'))).toBe(true);
+      expect(await exists(path.join(dir, 'recent-dead'))).toBe(true);
+    } finally {
+      readdirSync.mockRestore();
+      readdir.mockRestore();
+      readFile.mockRestore();
+      kill.mockRestore();
+      restoreDir();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('removes old dead sessions and keeps recent or alive sessions', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-clean-'));
     const restoreDir = setSessionDir(dir);

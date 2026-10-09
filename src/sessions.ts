@@ -1,13 +1,5 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-
-import { cleanStaleSessionsSync } from './clean';
-import {
-  getSessionBaseDir,
-  isPidAlive,
-  newestSessionIds,
-  readMetaSync,
-} from './discovery';
+import { cleanStaleSessionEntriesSync } from './clean';
+import { getSessionEntries } from './discovery';
 import type { SessionMeta } from './session';
 import type { EventLoggerMetadata } from './types';
 
@@ -30,35 +22,18 @@ export interface ListSessionsOptions {
 export async function listSessions(
   options: ListSessionsOptions = {}
 ): Promise<ListedSession[]> {
-  cleanStaleSessionsSync();
-  const baseDir = getSessionBaseDir();
-  const entries = await fs
-    .readdir(baseDir, { withFileTypes: true })
-    .catch(() => []);
-  const sessions: ListedSession[] = [];
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const sessionDir = path.join(baseDir, entry.name);
-    const meta = readMetaSync(sessionDir);
-    if (!meta) continue;
-    sessions.push({
-      id: entry.name,
-      pid: meta.pid,
-      alive: false,
-      startedAt: meta.startedAt,
-      command: meta.command,
-      cwd: meta.cwd,
-      metadata: meta.metadata,
-      origin: meta.origin,
-      sessionDir,
-    });
-  }
-
-  const newest = newestSessionIds(sessions);
-  for (const session of sessions) {
-    session.alive = isPidAlive(session.pid) && newest.has(session.id);
-  }
+  const entries = cleanStaleSessionEntriesSync(getSessionEntries());
+  const sessions: ListedSession[] = entries.map(({ id, dir, meta, alive }) => ({
+    id,
+    pid: meta.pid,
+    alive,
+    startedAt: meta.startedAt,
+    command: meta.command,
+    cwd: meta.cwd,
+    metadata: meta.metadata,
+    origin: meta.origin,
+    sessionDir: dir,
+  }));
 
   return filterSessions(sessions, options.selector).sort(
     (a, b) => b.startedAt - a.startedAt
