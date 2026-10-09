@@ -8,6 +8,38 @@ import { describe, expect, it, vi } from 'vitest';
 import { LogStream, type LogStreamDrain } from '../logStream';
 
 describe('logStream', () => {
+  it('flushes complete blocks while retaining and joining partial tails', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-block-'));
+    const file = path.join(dir, 'events.jsonl');
+    const stream = new LogStream(file);
+    const block = Array.from({ length: 5000 }, (_, i) => `${i}:漢😀\n`).join(
+      ''
+    );
+    try {
+      stream.write('header');
+      stream.write(`\n${block}尾`);
+      await flush(stream);
+      expect(await fs.readFile(file, 'utf8')).toBe(`header\n${block}`);
+      expect(stream.buffered).toBe(1);
+
+      stream.write('部\nnext\nrest');
+      await flush(stream);
+      expect(await fs.readFile(file, 'utf8')).toBe(
+        `header\n${block}尾部\nnext\n`
+      );
+      expect(stream.buffered).toBe(4);
+
+      await new Promise<void>(resolve => stream.end('終\n', resolve));
+      expect(await fs.readFile(file, 'utf8')).toBe(
+        `header\n${block}尾部\nnext\nrest終\n`
+      );
+      expect(stream.buffered).toBe(0);
+    } finally {
+      stream.destroy();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('preserves queued lines and partial tails across repeated batch drains', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-queue-'));
     const file = path.join(dir, 'events.jsonl');
