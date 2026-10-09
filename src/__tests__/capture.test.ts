@@ -1,7 +1,8 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -66,6 +67,49 @@ function spawnChild(capture: EventCapture, script: string) {
 }
 
 describe('captureEvents', () => {
+  it('preserves order while a backlog is consumed, refilled, and emptied', async () => {
+    const stream = new PassThrough();
+    const capture = captureEvents();
+    capture.spawnOptions({ env: {} });
+    capture.attach({
+      stdio: [null, null, null, stream],
+    } as unknown as ChildProcess);
+    const iterator = capture[Symbol.asyncIterator]();
+    const write = (start: number, count: number) => {
+      stream.write(
+        Array.from(
+          { length: count },
+          (_, index) =>
+            `{"_e":"bulk:row","_t":${start + index},"i":${start + index}}\n`
+        ).join('')
+      );
+    };
+    const received: number[] = [];
+    const read = async (count: number) => {
+      for (let index = 0; index < count; index++) {
+        const result = await iterator.next();
+        expect(result.done).toBe(false);
+        received.push(result.value.i);
+      }
+    };
+
+    write(0, 4096);
+    await read(3072);
+    write(4096, 2048);
+    await read(3072);
+    // Reuse the empty queue, then deliver directly to a waiting iterator.
+    write(6144, 1);
+    await read(1);
+    const waiting = iterator.next();
+    write(6145, 1);
+    received.push((await waiting).value.i);
+    // The final unterminated line must also be drained before completion.
+    stream.end('{"_e":"bulk:row","_t":6146,"i":6146}');
+    await read(1);
+    expect(await iterator.next()).toEqual({ done: true, value: undefined });
+    expect(received).toEqual(Array.from({ length: 6147 }, (_, index) => index));
+  });
+
   it.each(['file', 'fd'])(
     'identifies ordinary children of an explicit %s target',
     async target => {
