@@ -79,7 +79,7 @@ describe('install session', () => {
     const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
     const session = createSession({
       command: 'test command',
-      version: '1.2.3',
+      metadata: { version: '1.2.3' },
     });
 
     try {
@@ -95,7 +95,7 @@ describe('install session', () => {
         cwd: process.cwd(),
         formatVersion: EVENT_LOG_FORMAT_VERSION,
         maxSegments: 3,
-        version: '1.2.3',
+        metadata: { version: '1.2.3' },
         socket:
           process.platform === 'win32' ? pipeName : SESSION_FILES.liveSocket,
         ipcSocket:
@@ -422,8 +422,10 @@ describe('install explicit file target', () => {
         vi.resetModules();
         const { installEventLogger, flushEventLogger } =
           await import('../install');
-        installEventLogger(version == null ? undefined : { version });
-        installEventLogger({ version: '9.9.9' });
+        installEventLogger(
+          version == null ? undefined : { metadata: { version } }
+        );
+        installEventLogger({ metadata: { version: '9.9.9' } });
         await flushEventLogger();
         const lines = (await fs.readFile(file, 'utf8'))
           .trim()
@@ -432,9 +434,12 @@ describe('install explicit file target', () => {
         expect(lines).toEqual([
           expect.objectContaining({
             _e: 'root:init',
-            version: version ?? 'UNVERSIONED',
           }),
         ]);
+        expect(lines[0].metadata).toEqual(
+          version == null ? undefined : { version }
+        );
+        expect(lines[0]).not.toHaveProperty('version');
       } finally {
         const sink = eventLogState.primarySink as LogStream | undefined;
         const closed =

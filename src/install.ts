@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import type { EventLoggerMetadata } from './types';
 import { events } from './events';
 import {
   EVENT_LOG_FORMAT_VERSION,
@@ -104,7 +105,7 @@ export function installEventLogger(
           };
     const sink = createPrimarySink(destination);
     publishTempIpcSink(sink);
-    activateSink(sink, options?.version);
+    activateSink(sink, options?.metadata);
     return;
   }
 
@@ -118,7 +119,7 @@ export function installEventLogger(
       debug: eventLogState.debug,
       sessionDir: session.sessionDir,
     };
-    activateSink(session.sink, options.version);
+    activateSink(session.sink, session.meta.metadata, session.updateMetadata);
   }
 }
 
@@ -162,17 +163,29 @@ function createPrimarySink(
   // A dead target restores the no-op hot path
   stream.once('error', () => {
     eventLogState.primarySink = undefined;
+    eventLogState.updateMetadata = undefined;
     eventLogState.eventLoggerInfo = null;
   });
   return stream;
 }
 
-function activateSink(sink: EventSink, version?: string) {
+export function updateEventLoggerMetadata(patch: EventLoggerMetadata): void {
+  if (!eventLogState.primarySink?.writable) return;
+  eventLogState.updateMetadata?.(patch);
+  rootEvent('metadata', { metadata: patch });
+}
+
+function activateSink(
+  sink: EventSink,
+  initialMetadata?: EventLoggerMetadata,
+  updateMetadata?: (patch: EventLoggerMetadata) => void
+) {
   eventLogState.primarySink = sink;
+  eventLogState.updateMetadata = updateMetadata;
   const metadata = {
     format: 'v0-jsonl',
     formatVersion: EVENT_LOG_FORMAT_VERSION,
-    version: version ?? 'UNVERSIONED',
+    metadata: initialMetadata,
     processOrigin: getProcessOrigin() ?? undefined,
   };
   rootEvent('init', metadata);
@@ -190,6 +203,6 @@ function connectToParent(options?: InstallEventLoggerOptions): boolean {
     isUserVisibleOutput: false,
     debug: eventLogState.debug,
   };
-  activateSink(sink);
+  activateSink(sink, options?.metadata);
   return true;
 }

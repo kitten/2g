@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
 
+import type { EventLoggerMetadata } from './types';
 import {
   DEBUG_SEGMENTS,
   DEBUG_SEGMENT_SIZE,
@@ -26,7 +27,7 @@ import {
 
 export interface SessionOptions {
   command?: string;
-  version?: string;
+  metadata?: EventLoggerMetadata;
   maxSegments?: number;
   maxSegmentSize?: number;
 }
@@ -38,7 +39,7 @@ export interface SessionMeta {
   command: string;
   cwd: string;
   maxSegments: number;
-  version?: string;
+  metadata?: EventLoggerMetadata;
   // Relative to meta.json, or a Windows named-pipe name
   socket: string;
   ipcSocket: string;
@@ -59,6 +60,7 @@ export interface SessionContext {
   sessionDir: string;
   meta: SessionMeta;
   sink: EventSink;
+  updateMetadata(patch: EventLoggerMetadata): void;
   destroy(): void;
 }
 
@@ -107,17 +109,21 @@ export function createSession(options: SessionOptions): SessionContext {
     command: options.command ?? process.argv.slice(1).join(' '),
     cwd: process.cwd(),
     maxSegments,
-    version: options.version,
     socket: liveSocket.name,
     ipcSocket: ipcSocket.name,
     origin: createSessionOrigin(),
   };
-  // Without meta.json the session is invisible to tooling; logging still works
-  try {
-    writeJsonAtomic(path.join(sessionDir, SESSION_FILES.meta), meta);
-  } catch {}
-
   let destroyed = false;
+  function updateMetadata(patch?: EventLoggerMetadata) {
+    if (destroyed) return;
+    try {
+      if (patch) Object.assign((meta.metadata ??= Object.create(null)), patch);
+      writeJsonAtomic(path.join(sessionDir, SESSION_FILES.meta), meta);
+    } catch {}
+  }
+  // Without meta.json the session is invisible to tooling; logging still works
+  updateMetadata(options.metadata);
+
   const destroy = () => {
     if (destroyed) return;
     destroyed = true;
@@ -139,7 +145,7 @@ export function createSession(options: SessionOptions): SessionContext {
     } catch {}
   });
 
-  return { sessionDir, meta, sink, destroy };
+  return { sessionDir, meta, sink, updateMetadata, destroy };
 }
 
 function trackSegmentRotation(

@@ -40,13 +40,13 @@ describe('api', () => {
     events('root')('init', {
       format: 'v0-jsonl',
       formatVersion: 1,
-      version: 'test',
+      metadata: { version: 'test' },
     });
 
     expect(lines).toHaveLength(1);
     expect(JSON.parse(lines[0])).toMatchObject({
       _e: 'root:init',
-      version: 'test',
+      metadata: { version: 'test' },
     });
   });
 

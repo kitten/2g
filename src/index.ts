@@ -6,6 +6,7 @@ export {
   installEventLogger,
   installChildEventLogger,
   flushEventLogger,
+  updateEventLoggerMetadata,
   getEventLoggerInfo,
   type EventLoggerInfo,
   type InstallEventLoggerOptions,
