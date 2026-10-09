@@ -494,7 +494,13 @@ export class LogStream
     const maybeCb = arg3 || arg2;
     const encoding = typeof arg2 === 'string' ? arg2 : 'utf8';
     const data =
-      typeof input === 'string' ? input : Buffer.from(input).toString(encoding);
+      typeof input === 'string'
+        ? input
+        : Buffer.from(
+            input.buffer,
+            input.byteOffset,
+            input.byteLength
+          ).toString(encoding);
     const cb = typeof maybeCb === 'function' ? maybeCb : undefined;
     try {
       return this._write(data);
