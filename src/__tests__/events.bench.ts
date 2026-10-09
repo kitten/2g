@@ -1,6 +1,7 @@
-import { bench, describe } from 'vitest';
+import { afterAll, bench, describe, expect } from 'vitest';
 
 import { events } from '../events';
+import type { EventLogger } from '../types';
 import type { EventSink } from '../utils/logStream';
 import { writeCompleteEvent, writeEvent } from '../utils/serializeEvent';
 
@@ -28,6 +29,15 @@ const sink: EventSink = {
 };
 
 describe('event api overhead', () => {
+  let loggers: EventLogger<'metro'>[] = [];
+  afterAll(() => {
+    expect(loggers.every(logger => logger.category === 'metro')).toBe(true);
+  });
+
+  bench('create 1000 event loggers', () => {
+    loggers = Array.from({ length: 1000 }, () => events('metro'));
+  });
+
   bench('event logger disabled call', () => {
     event('bundling:progress', payload);
   });
