@@ -23,7 +23,8 @@ export class EventCapture implements AsyncIterable<ParsedEvent> {
   #index: number | undefined;
   #attached = false;
   #done = false;
-  #events: ParsedEvent[] = [];
+  #events: Array<ParsedEvent | null> = [];
+  #head = 0;
   #waiters: Array<(event: ParsedEvent | null) => void> = [];
 
   constructor(options: CaptureOptions = {}) {
@@ -121,7 +122,19 @@ export class EventCapture implements AsyncIterable<ParsedEvent> {
   }
 
   #next(): Promise<ParsedEvent | null> {
-    if (this.#events.length) return Promise.resolve(this.#events.shift()!);
+    if (this.#head < this.#events.length) {
+      const event = this.#events[this.#head];
+      this.#events[this.#head++] = null;
+      if (this.#head === this.#events.length) {
+        this.#events.length = 0;
+        this.#head = 0;
+      } else if (this.#head >= 1024 && this.#head * 2 >= this.#events.length) {
+        // Release consumed slots without moving the pending tail per event.
+        this.#events = this.#events.slice(this.#head);
+        this.#head = 0;
+      }
+      return Promise.resolve(event);
+    }
     if (this.#done) return Promise.resolve(null);
     if (!this.#attached)
       throw new Error('captureEvents: attach() a child before iterating');
