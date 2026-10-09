@@ -24,6 +24,41 @@ describe('record command', () => {
     }
   });
 
+  it.each(['chrome-trace', 'opentelemetry'])(
+    'honors --debug for %s',
+    async format => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-record-'));
+      const output = path.join(dir, 'trace.json');
+      const script =
+        'require("fs").writeSync(3,JSON.stringify({_e:"build:debug",_t:Date.now(),_l:1})+"\\n");';
+      try {
+        for (const debug of [false, true]) {
+          await runRecordCli([
+            '--format',
+            format,
+            ...(debug ? ['--debug'] : []),
+            '-o',
+            output,
+            '--',
+            process.execPath,
+            '-e',
+            script,
+          ]);
+          const trace = JSON.parse(await fs.readFile(output, 'utf8'));
+          const events =
+            format === 'chrome-trace'
+              ? trace.traceEvents
+              : (trace.resourceSpans[0].scopeSpans[0].spans[0].events ?? []);
+          expect(
+            events.some((event: { name: string }) => event.name === 'debug')
+          ).toBe(debug);
+        }
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('errors when no command is given', async () => {
     await expect(runRecordCli(['-o', 'trace.json'])).rejects.toThrow(
       'record needs a command to run'

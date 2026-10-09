@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 
 import { captureEvents } from '../../capture';
 import { redirectConsoleToStderr } from '../../utils/redirectConsole';
-import { filterEvents, parseHelp } from '../shared';
+import { parseHelp } from '../shared';
 import { convertToChromeTrace } from '../export/chromeTrace';
 import { convertToOpenTelemetry } from '../export/opentelemetry';
 
@@ -65,15 +65,14 @@ export async function runRecordCli(args: string[]) {
     );
   });
 
-  const meta = { pid: child.pid, processName: command.join(' ') };
-  const filtered = filterEvents(capture, options);
+  const meta = { ...options, pid: child.pid, processName: command.join(' ') };
 
   try {
     // Draining the events resolves once the child closes its event pipe (on exit)
     const file =
       options.format === 'opentelemetry'
-        ? await convertToOpenTelemetry(filtered, meta)
-        : await convertToChromeTrace(filtered, meta);
+        ? await convertToOpenTelemetry(capture, meta)
+        : await convertToChromeTrace(capture, meta);
     const exitCode = await exited;
 
     const output = JSON.stringify(file, null, 2);

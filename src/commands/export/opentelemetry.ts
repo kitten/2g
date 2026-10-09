@@ -1,11 +1,9 @@
 import crypto from 'node:crypto';
 
+import { ExportContext, type ExportOptions } from './context';
 import type { ParsedEvent } from '../../types';
 
-export interface ConvertToOpenTelemetryOptions {
-  processName?: string;
-  pid?: number;
-}
+export interface ConvertToOpenTelemetryOptions extends ExportOptions {}
 
 export interface OpenTelemetryFile {
   resourceSpans: OpenTelemetryResourceSpan[];
@@ -71,16 +69,17 @@ class OpenTelemetryConverter {
   readonly #sessionSpanId = createSpanId();
   readonly #spans: OpenTelemetrySpan[] = [];
   readonly #events: OpenTelemetrySpanEvent[] = [];
-  #processName: string;
-  #version = '0.1.0';
+  #context: ExportContext;
   #startTimeUnixNano: string | undefined;
   #endTimeUnixNano: string | undefined;
 
   constructor(private readonly options: ConvertToOpenTelemetryOptions) {
-    this.#processName = options.processName ?? '2g';
+    this.#context = new ExportContext(options);
   }
 
-  add(event: ParsedEvent) {
+  add(input: ParsedEvent) {
+    const event = this.#context.read(input);
+    if (!event) return;
     const eventTime = unixNano(event._t);
     const startTime =
       typeof event._d === 'number' ? unixNano(event._t - event._d) : eventTime;
@@ -95,15 +94,7 @@ class OpenTelemetryConverter {
         ? eventTime
         : this.#endTimeUnixNano;
 
-    if (event._e === 'root:init') {
-      if (!event._w && typeof event.version === 'string') {
-        this.#version = event.version;
-        if (this.#processName === '2g') {
-          this.#processName = `2g (v${event.version})`;
-        }
-      }
-      return;
-    }
+    if (event._e === 'root:init') return;
 
     if (typeof event._d === 'number') {
       this.#spans.push(this.#createSpan(event));
@@ -120,8 +111,8 @@ class OpenTelemetryConverter {
         {
           resource: {
             attributes: attributes({
-              'service.name': this.#processName,
-              'service.version': this.#version,
+              'service.name': this.#context.processName,
+              'service.version': this.#context.version,
               'process.pid': this.options.pid,
               'telemetry.sdk.name': '2g',
               'telemetry.sdk.language': 'nodejs',
@@ -134,7 +125,7 @@ class OpenTelemetryConverter {
                 {
                   traceId: this.#traceId,
                   spanId: this.#sessionSpanId,
-                  name: this.#processName,
+                  name: this.#context.processName,
                   startTimeUnixNano,
                   endTimeUnixNano,
                   attributes: attributes({
