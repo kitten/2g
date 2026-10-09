@@ -59,8 +59,14 @@ export async function convertToChromeTrace(
   return converter.toTraceFile();
 }
 
+interface Track {
+  name: string;
+  spans: PendingSpan[];
+  tid: number;
+}
+
 interface PendingSpan {
-  track: string;
+  track: Track;
   name: string;
   cat: string;
   ts: number;
@@ -70,7 +76,7 @@ interface PendingSpan {
 }
 
 interface PendingInstant {
-  track: string;
+  track: Track;
   name: string;
   cat: string;
   ts: number;
@@ -83,7 +89,7 @@ type PendingEvent =
 
 export class TraceConverter {
   #pending: PendingEvent[] = [];
-  #tracks = new Map<string, string>();
+  #tracks = new Map<string, Track>();
   #pid: number;
   #context: ExportContext;
 
@@ -104,7 +110,7 @@ export class TraceConverter {
     const args = extractArgs(event);
 
     if (typeof event._d === 'number') {
-      this.#pending.push({
+      const span: PendingEvent = {
         kind: 'span',
         track,
         name: stripSuffix(parsed.name),
@@ -113,7 +119,9 @@ export class TraceConverter {
         dur: Math.round(event._d * 1000),
         args,
         lane: 0,
-      });
+      };
+      track.spans.push(span);
+      this.#pending.push(span);
     } else {
       this.#pending.push({
         kind: 'instant',
@@ -128,14 +136,8 @@ export class TraceConverter {
 
   toTraceFile(): TraceFile {
     let base = this.#pending.length ? Infinity : 0;
-    const spansByTrack = new Map<string, PendingSpan[]>();
     for (const event of this.#pending) {
       if (event.ts < base) base = event.ts;
-      if (event.kind === 'span') {
-        let spans = spansByTrack.get(event.track);
-        if (!spans) spansByTrack.set(event.track, (spans = []));
-        spans.push(event);
-      }
     }
     const traceEvents: TraceEvent[] = [
       {
@@ -146,14 +148,12 @@ export class TraceConverter {
       },
     ];
 
-    const tids = new Map<string, number>();
     let nextTid = 1;
-    for (const [track, displayName] of this.#tracks) {
-      const spans = spansByTrack.get(track) ?? [];
-      const laneCount = Math.max(assignLanes(spans), 1);
+    for (const track of this.#tracks.values()) {
+      const laneCount = Math.max(assignLanes(track.spans), 1);
+      track.tid = nextTid;
       for (let lane = 0; lane < laneCount; lane++) {
         const tid = nextTid++;
-        tids.set(`${track}\0${lane}`, tid);
         traceEvents.push(
           {
             ph: 'M',
@@ -161,7 +161,7 @@ export class TraceConverter {
             pid: this.#pid,
             tid,
             args: {
-              name: lane === 0 ? displayName : `${displayName} #${lane + 1}`,
+              name: lane === 0 ? track.name : `${track.name} #${lane + 1}`,
             },
           },
           {
@@ -177,7 +177,7 @@ export class TraceConverter {
 
     for (const event of this.#pending) {
       const lane = event.kind === 'span' ? event.lane : 0;
-      const tid = tids.get(`${event.track}\0${lane}`)!;
+      const tid = event.track.tid + lane;
       if (event.kind === 'span') {
         traceEvents.push({
           ph: 'X',
@@ -217,20 +217,24 @@ export class TraceConverter {
 
   #getTrack(category: string, worker?: string) {
     const key = worker ? `${category}:${worker}` : category;
-    if (!this.#tracks.has(key)) {
-      this.#tracks.set(key, worker ? `${category} ${worker}` : category);
+    let track = this.#tracks.get(key);
+    if (!track) {
+      track = {
+        name: worker ? `${category} ${worker}` : category,
+        spans: [],
+        tid: 0,
+      };
+      this.#tracks.set(key, track);
     }
-    return key;
+    return track;
   }
 }
 
 // 'X' events on one tid nest by containment; partial overlap is invalid.
 function assignLanes(spans: PendingSpan[]) {
-  const order = [...spans].sort(
-    (a, b) => a.ts - b.ts || b.ts + b.dur - (a.ts + a.dur)
-  );
+  spans.sort((a, b) => a.ts - b.ts || b.ts + b.dur - (a.ts + a.dur));
   const lanes: PendingSpan[][] = [];
-  for (const span of order) {
+  for (const span of spans) {
     const end = span.ts + span.dur;
     let lane = -1;
     for (let index = 0; index < lanes.length; index++) {
