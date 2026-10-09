@@ -447,25 +447,24 @@ export class LogStream
 
     this.#len += data.length;
 
-    let startIdx = 0;
-    let endIdx = -1;
-    while ((endIdx = data.indexOf('\n', startIdx)) > -1) {
-      const line = data.slice(startIdx, endIdx + 1);
+    // Queue complete lines as one block and retain only the unfinished tail.
+    const end = data.lastIndexOf('\n') + 1;
+    if (end) {
+      const line = end === data.length ? data : data.slice(0, end);
       if (this.#partialLine > 0) {
         this.#lines[this.#lines.length - 1] += line;
       } else {
         this.#lines.push(line);
       }
       this.#partialLine = 0;
-      startIdx = ++endIdx;
     }
 
-    if (startIdx < data.length) {
-      const line = data.slice(startIdx);
+    if (end < data.length) {
+      const line = data.slice(end);
       if (this.#partialLine > 0) {
         this.#lines[this.#lines.length - 1] += line;
       } else {
-        this.#lines.push(data.slice(startIdx));
+        this.#lines.push(line);
       }
       this.#partialLine = 1;
     }
