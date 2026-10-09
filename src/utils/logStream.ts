@@ -388,32 +388,41 @@ export class LogStream
     if (this.#destroyed) {
       cb?.();
     } else {
+      let settled = false;
+      const finish = (error?: Error | null) => {
+        if (settled) return;
+        settled = true;
+        this.#flushPending = false;
+        this.off('drain', onDrain);
+        this.off('error', finish);
+        this.off('close', onClose);
+        cb?.(error);
+      };
+
       const onDrain = () => {
         if (!this.#destroyed) {
           fsFsync(this.#fd, error => {
-            this.#flushPending = false;
-            if (error?.code === 'EBADF') {
-              cb?.(); // If fd is closed, ignore the error
-            } else {
-              cb?.(error);
-            }
+            // If fd is closed, ignore the error.
+            finish(error?.code === 'EBADF' ? undefined : error);
           });
         } else {
-          this.#flushPending = false;
-          cb?.();
+          onClose();
         }
-        this.off('error', onError);
       };
 
-      const onError = (err: Error) => {
-        this.#flushPending = false;
-        this.off('drain', onDrain);
-        cb?.(err);
+      const onClose = (error?: Error | null) => {
+        finish(
+          error ??
+            (this.buffered > 0
+              ? new Error('Log stream closed before flushing buffered data')
+              : undefined)
+        );
       };
 
       this.#flushPending = true;
       this.once('drain', onDrain);
-      this.once('error', onError);
+      this.once('error', finish);
+      this.once('close', onClose);
 
       if (!this.#writing) {
         if (this.#lines.length - this.#head > this.#partialLine) {

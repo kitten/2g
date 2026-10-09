@@ -8,6 +8,41 @@ import { describe, expect, it, vi } from 'vitest';
 import { LogStream, type LogStreamDrain } from '../logStream';
 
 describe('logStream', () => {
+  it.each(['end', 'destroy', 'discard', 'error'] as const)(
+    'settles pending flushes exactly once during %s',
+    mode => {
+      let release!: Parameters<LogStreamDrain>[1];
+      const stream = new LogStream(open =>
+        open(null, null, (_data, cb) => {
+          release = cb;
+        })
+      );
+      const callbacks = [vi.fn(), vi.fn()];
+      stream._writeln('x'.repeat(65_536) + '\n');
+      if (mode === 'discard') stream._writeln('pending\n');
+      for (const callback of callbacks) stream.flush(callback);
+      if (mode === 'end') stream.end();
+      else stream.destroy();
+      const error = mode === 'error' ? new Error('write failed') : undefined;
+      release(error);
+
+      for (const callback of callbacks) {
+        expect(callback).toHaveBeenCalledTimes(1);
+        if (mode === 'discard') {
+          expect(callback.mock.calls[0][0]).toEqual(
+            new Error('Log stream closed before flushing buffered data')
+          );
+        } else {
+          expect(callback).toHaveBeenCalledWith(error);
+        }
+      }
+      expect(stream.writable).toBe(false);
+      for (const event of ['drain', 'error', 'close']) {
+        expect(stream.listenerCount(event)).toBe(0);
+      }
+    }
+  );
+
   it.each(['Buffer', 'Uint8Array'])(
     'decodes only the supplied %s view before returning from write',
     async kind => {
