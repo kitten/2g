@@ -2,18 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
 
+import type { EventLoggerMetadata } from './types';
 import {
   DEBUG_SEGMENTS,
   DEBUG_SEGMENT_SIZE,
   DEFAULT_SEGMENTS,
   DEFAULT_SEGMENT_SIZE,
-  EVENT_LOG_FORMAT_VERSION,
+  EVENT_LOG_FORMAT,
   SESSION_FILES,
 } from './constants';
 import { cleanStaleSessionsSync } from './clean';
 import { getSessionBaseDir } from './discovery';
 import { createDebugSink } from './debug';
 import { eventLogState } from './state';
+import { filterMetadata } from './utils/filterMetadata';
 import { BroadcastChannel } from './utils/broadcastChannel';
 import { LogStream, type EventSink } from './utils/logStream';
 import { ingestIpcSocket, publishChildEnv } from './utils/ipc';
@@ -26,19 +28,18 @@ import {
 
 export interface SessionOptions {
   command?: string;
-  version?: string;
+  metadata?: EventLoggerMetadata;
   maxSegments?: number;
   maxSegmentSize?: number;
 }
 
 export interface SessionMeta {
   pid: number;
-  formatVersion: number;
   startedAt: number;
   command: string;
   cwd: string;
   maxSegments: number;
-  version?: string;
+  metadata: EventLoggerMetadata;
   // Relative to meta.json, or a Windows named-pipe name
   socket: string;
   ipcSocket: string;
@@ -59,6 +60,7 @@ export interface SessionContext {
   sessionDir: string;
   meta: SessionMeta;
   sink: EventSink;
+  updateMetadata(patch: EventLoggerMetadata): void;
   destroy(): void;
 }
 
@@ -102,22 +104,37 @@ export function createSession(options: SessionOptions): SessionContext {
 
   const meta: SessionMeta = {
     pid: process.pid,
-    formatVersion: EVENT_LOG_FORMAT_VERSION,
     startedAt,
     command: options.command ?? process.argv.slice(1).join(' '),
     cwd: process.cwd(),
     maxSegments,
-    version: options.version,
     socket: liveSocket.name,
     ipcSocket: ipcSocket.name,
     origin: createSessionOrigin(),
+    metadata: Object.assign(Object.create(null), { format: EVENT_LOG_FORMAT }),
   };
-  // Without meta.json the session is invisible to tooling; logging still works
-  try {
-    writeJsonAtomic(path.join(sessionDir, SESSION_FILES.meta), meta);
-  } catch {}
 
   let destroyed = false;
+
+  function updateMetadata(patch?: EventLoggerMetadata) {
+    if (destroyed) return;
+    try {
+      if (patch) {
+        for (const key in patch) {
+          const value = patch[key];
+          if (value !== undefined) meta.metadata[key] = value;
+        }
+      }
+      writeJsonAtomic(path.join(sessionDir, SESSION_FILES.meta), {
+        ...meta,
+        metadata: filterMetadata(meta.metadata),
+      });
+    } catch {}
+  }
+
+  // Without meta.json the session is invisible to tooling; logging still works
+  updateMetadata(options.metadata);
+
   const destroy = () => {
     if (destroyed) return;
     destroyed = true;
@@ -139,7 +156,7 @@ export function createSession(options: SessionOptions): SessionContext {
     } catch {}
   });
 
-  return { sessionDir, meta, sink, destroy };
+  return { sessionDir, meta, sink, updateMetadata, destroy };
 }
 
 function trackSegmentRotation(

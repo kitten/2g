@@ -144,6 +144,66 @@ describe('export command', () => {
     }
   });
 
+  it.each(['chrome-trace', 'opentelemetry'])(
+    'uses persisted version after metadata events rotate out for %s',
+    async format => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-export-'));
+      const restoreDir = setSessionDir(dir);
+      const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+      const output = path.join(dir, 'trace.json');
+      const session = createSession({
+        command: 'app',
+        metadata: { version: '1.2.3' },
+        maxSegmentSize: 1,
+        maxSegments: 2,
+      });
+      try {
+        for (const event of [
+          { _e: 'root:init', version: '1.2.3' },
+          { _e: 'app:tick' },
+          { _e: 'app:done' },
+        ]) {
+          session.sink._writeln(
+            JSON.stringify({ _t: Date.now(), ...event }) + '\n'
+          );
+          await new Promise<void>((resolve, reject) =>
+            session.sink.flush!(error => (error ? reject(error) : resolve()))
+          );
+        }
+        await runExportCli([
+          path.basename(session.sessionDir),
+          '--format',
+          format,
+          '-o',
+          output,
+        ]);
+        const trace = JSON.parse(await fs.readFile(output, 'utf8'));
+        const name = `app (v1.2.3, PID ${process.pid})`;
+        if (format === 'chrome-trace') {
+          expect(trace.metadata.version).toBe('1.2.3');
+          expect(trace.traceEvents).toContainEqual(
+            expect.objectContaining({
+              name: 'process_name',
+              args: { name },
+            })
+          );
+        } else {
+          expect(trace.resourceSpans[0].resource.attributes).toEqual(
+            expect.arrayContaining([
+              { key: 'service.name', value: { stringValue: name } },
+              { key: 'service.version', value: { stringValue: '1.2.3' } },
+            ])
+          );
+        }
+      } finally {
+        session.destroy();
+        restoreDir();
+        restoreIpc();
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('filters exported events by repeated and comma-separated patterns', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-export-'));
     const input = path.join(dir, 'events.jsonl');
@@ -154,6 +214,11 @@ describe('export command', () => {
         JSON.stringify({ _e: 'metro:done', _t: 900 }),
         JSON.stringify({ _e: 'env:info', _t: 1000 }),
         JSON.stringify({ _e: 'server:error', _t: 1100 }),
+        JSON.stringify({
+          _e: 'root:update',
+          _t: 1200,
+          version: '2',
+        }),
       ].join('\n') + '\n'
     );
 
@@ -168,9 +233,9 @@ describe('export command', () => {
         '-o',
         output,
       ]);
-      const serialized = JSON.stringify(
-        JSON.parse(await fs.readFile(output, 'utf8'))
-      );
+      const trace = JSON.parse(await fs.readFile(output, 'utf8'));
+      expect(trace.metadata.version).toBe('2');
+      const serialized = JSON.stringify(trace);
       expect(serialized).toContain('metro');
       expect(serialized).toContain('env');
       expect(serialized).not.toContain('server');

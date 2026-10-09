@@ -7,7 +7,7 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  EVENT_LOG_FORMAT_VERSION,
+  EVENT_LOG_FORMAT,
   INTERNAL_IPC_ENV,
   SESSION_FILES,
 } from '../constants';
@@ -38,7 +38,7 @@ describe('tap', () => {
       await fs.writeFile(
         path.join(dir, SESSION_FILES.meta),
         JSON.stringify({
-          formatVersion: EVENT_LOG_FORMAT_VERSION,
+          metadata: { format: EVENT_LOG_FORMAT },
           socket: process.platform === 'win32' ? socketPath : 'cleanup.sock',
           maxSegments: 1,
         })
@@ -127,15 +127,14 @@ describe('tap', () => {
     const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
     const session = createSession({
       command: 'test command',
-      version: '1.2.3',
+      metadata: { version: '1.2.3' },
     });
 
     try {
       const discovered = await listSessions();
       expect(discovered[0]).toMatchObject({
         command: 'test command',
-        formatVersion: EVENT_LOG_FORMAT_VERSION,
-        version: '1.2.3',
+        metadata: { version: '1.2.3' },
         origin: {
           argv: process.argv.slice(1),
           cwd: process.cwd(),
@@ -207,7 +206,7 @@ describe('tap', () => {
       path.join(sessionDir, SESSION_FILES.meta),
       JSON.stringify({
         pid: process.pid,
-        formatVersion: EVENT_LOG_FORMAT_VERSION,
+        metadata: { format: EVENT_LOG_FORMAT },
         startedAt: Date.now(),
         command: 'custom-socket',
         cwd: process.cwd(),
@@ -405,7 +404,7 @@ describe('tap', () => {
     ).toBeNull();
   });
 
-  it('filters incompatible sessions from discovery', async () => {
+  it('discovers sessions without validating their format', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-tap-'));
     const incompatible = path.join(dir, '999');
     const restoreDir = setSessionDir(dir);
@@ -414,7 +413,7 @@ describe('tap', () => {
       path.join(incompatible, SESSION_FILES.meta),
       JSON.stringify({
         pid: process.pid,
-        formatVersion: EVENT_LOG_FORMAT_VERSION + 1,
+        metadata: { format: 'unknown' },
         startedAt: Date.now(),
         command: 'incompatible',
         cwd: process.cwd(),
@@ -424,7 +423,9 @@ describe('tap', () => {
     );
 
     try {
-      expect(await listSessions()).toEqual([]);
+      expect(await listSessions()).toEqual([
+        expect.objectContaining({ command: 'incompatible' }),
+      ]);
     } finally {
       restoreDir();
       await fs.rm(dir, { recursive: true, force: true });
@@ -558,7 +559,7 @@ async function writeMeta(
     path.join(sessionDir, SESSION_FILES.meta),
     JSON.stringify({
       pid,
-      formatVersion: EVENT_LOG_FORMAT_VERSION,
+      metadata: { format: EVENT_LOG_FORMAT },
       startedAt: Date.now(),
       command,
       cwd,

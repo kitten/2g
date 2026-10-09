@@ -1,15 +1,13 @@
+import { ExportContext, type ExportOptions } from './context';
 import type { ParsedEvent } from '../../types';
 
-export interface ConvertToChromeTraceOptions {
-  processName?: string;
-  pid?: number;
-}
+export interface ConvertToChromeTraceOptions extends ExportOptions {}
 
 export interface TraceFile {
   traceEvents: TraceEvent[];
   metadata: {
     source: '2g';
-    version: string;
+    version?: string;
     convertedAt: string;
     startTime: string;
     startTimestampMs: number;
@@ -87,24 +85,16 @@ export class TraceConverter {
   #pending: PendingEvent[] = [];
   #tracks = new Map<string, string>();
   #pid: number;
-  #processName: string;
-  #version = '0.1.0';
+  #context: ExportContext;
 
   constructor(options: ConvertToChromeTraceOptions = {}) {
     this.#pid = options.pid ?? 1;
-    this.#processName = options.processName ?? '2g';
+    this.#context = new ExportContext(options);
   }
 
-  add(event: ParsedEvent) {
-    if (event._e === 'root:init') {
-      if (!event._w && typeof event.version === 'string') {
-        this.#version = event.version;
-        if (this.#processName === '2g') {
-          this.#processName = `2g (v${event.version})`;
-        }
-      }
-      return;
-    }
+  add(input: ParsedEvent) {
+    const event = this.#context.read(input);
+    if (!event) return;
 
     const parsed = splitEventName(event._e);
     const track = this.#getTrack(
@@ -146,7 +136,7 @@ export class TraceConverter {
         ph: 'M',
         name: 'process_name',
         pid: this.#pid,
-        args: { name: this.#processName },
+        args: { name: this.#context.processName },
       },
     ];
 
@@ -214,7 +204,7 @@ export class TraceConverter {
       traceEvents,
       metadata: {
         source: '2g',
-        version: this.#version,
+        version: this.#context.version,
         convertedAt: new Date().toISOString(),
         startTime: new Date(base / 1000).toISOString(),
         startTimestampMs: base / 1000,

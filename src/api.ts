@@ -14,4 +14,8 @@ export {
   type EventCapture,
 } from './capture';
 
-export type { ParsedEvent } from './types';
+export type {
+  ParsedEvent,
+  MetadataRegistry,
+  EventLoggerMetadata,
+} from './types';

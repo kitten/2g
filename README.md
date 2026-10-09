@@ -50,7 +50,10 @@ Install logging once when a CLI command starts, then create loggers in any packa
 ```ts
 import { installEventLogger, events } from '2g';
 
-installEventLogger({ command: 'expo start -p web', version: '1.0.0' });
+installEventLogger({
+  command: 'expo start -p web',
+  metadata: { version: '1.0.0' },
+});
 
 const log = events('metro');
 
@@ -122,6 +125,45 @@ printed, not which debug events are recorded:
 LOG_DEBUG=metro:* expo start
 LOG_DEBUG=* expo export
 ```
+
+### Changing session metadata
+
+Declare the application metadata you expect, then supply it at installation or as
+values become known:
+
+```ts
+import { installEventLogger, updateEventLoggerMetadata } from '2g';
+
+declare module '2g' {
+  interface MetadataRegistry {
+    port: number;
+    ready: boolean;
+    devServerUrl: string | null;
+  }
+}
+
+installEventLogger({ metadata: { version: '1.0.0', ready: false } });
+updateEventLoggerMetadata({
+  port: 8081,
+  devServerUrl: 'http://localhost:8081',
+});
+updateEventLoggerMetadata({ ready: true });
+```
+
+Both calls accept partial, JSON-compatible metadata. Updates merge shallowly:
+supplied keys replace previous values, including nested objects and arrays.
+Top-level `undefined` values are ignored, leaving existing values unchanged.
+
+Initial values emit `root:init`; later patches emit `root:update`. Sessions persist
+their own metadata in `meta.json`, visible through `ps` and `list()`. Child updates
+do not change the parent's metadata. Top-level metadata keys starting with `_`
+are omitted when saving.
+
+Metadata serialization omits circular references and BigInt values while retaining
+valid fields (omitted array elements become `null`).
+
+Use `metadata.version` for the application version. Persisted metadata also includes
+`format: 'v0-jsonl'` automatically.
 
 ### Deferred payload helpers
 
@@ -251,7 +293,7 @@ are optional:
 | Option           | Default | Description                                                                                                       |
 | ---------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
 | `command`        | argv    | Command line recorded in session metadata                                                                         |
-| `version`        | —       | Tool version recorded in session metadata and the init event                                                      |
+| `metadata`       | `{}`    | Initial application metadata, including optional `version`, recorded in the session and init event                |
 | `maxSegments`    | `3`     | Rotated JSONL segments kept per session                                                                           |
 | `maxSegmentSize` | 512 KiB | Segment size that triggers rotation                                                                               |
 | `session`        | `true`  | Allow the session fall-through; `false` keeps env-only activation                                                 |

@@ -6,7 +6,12 @@ describe('trace', () => {
   it('maps metadata, instants, spans, and workers to Chrome trace events', async () => {
     const trace = await convertToChromeTrace(
       [
-        { _e: 'root:init', _t: 900, format: 'v0-jsonl', version: '1.0.0' },
+        {
+          _e: 'root:init',
+          _t: 900,
+
+          version: '1.0.0',
+        },
         { _e: 'env:mode', _t: 1000, mode: 'development' },
         { _e: 'metro:bundling:done', _t: 1500, _d: 250.25, id: 'a' },
         {
@@ -26,7 +31,7 @@ describe('trace', () => {
         ph: 'i',
         name: 'mode',
         cat: 'env',
-        ts: 0,
+        ts: 100_000,
         s: 't',
       })
     );
@@ -35,7 +40,7 @@ describe('trace', () => {
         ph: 'X',
         name: 'bundling',
         cat: 'metro',
-        ts: 249_750,
+        ts: 349_750,
         dur: 250_250,
       })
     );
@@ -134,14 +139,12 @@ describe('trace', () => {
         _e: 'root:init',
         _t: 950,
         _w: 'worker_thread:1',
-        version: 'UNVERSIONED',
       },
       { _e: 'root:init', _t: 900, version: '1.0.0' },
       {
         _e: 'root:init',
         _t: 975,
         _w: 'event_log_child:2',
-        version: 'UNVERSIONED',
       },
       { _e: 'env:mode', _t: 1000 },
     ]);

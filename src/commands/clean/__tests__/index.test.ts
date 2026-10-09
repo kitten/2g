@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { EVENT_LOG_FORMAT_VERSION, SESSION_FILES } from '../../../constants';
+import { EVENT_LOG_FORMAT, SESSION_FILES } from '../../../constants';
 import { _setSessionBaseDir } from '../../../discovery';
 import { runCleanCli } from '../index';
 
@@ -88,7 +88,7 @@ async function writeMeta(sessionDir: string, pid: number) {
     path.join(sessionDir, SESSION_FILES.meta),
     JSON.stringify({
       pid,
-      formatVersion: EVENT_LOG_FORMAT_VERSION,
+      metadata: { format: EVENT_LOG_FORMAT },
       startedAt: Date.now(),
       command: 'clean test',
       cwd: process.cwd(),

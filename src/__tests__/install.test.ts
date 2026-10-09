@@ -6,11 +6,11 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  EVENT_LOG_FORMAT,
   DEBUG_SEGMENTS,
   DEFAULT_SEGMENTS,
   DEFAULT_SEGMENT_SIZE,
   DEFAULT_RETAIN_MS,
-  EVENT_LOG_FORMAT_VERSION,
   EVENT_LOG_TMP_DIR,
   INTERNAL_DEBUG_ENV,
   INTERNAL_IPC_ENV,
@@ -79,7 +79,7 @@ describe('install session', () => {
     const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
     const session = createSession({
       command: 'test command',
-      version: '1.2.3',
+      metadata: { version: '1.2.3' },
     });
 
     try {
@@ -93,9 +93,8 @@ describe('install session', () => {
       expect(meta).toMatchObject({
         command: 'test command',
         cwd: process.cwd(),
-        formatVersion: EVENT_LOG_FORMAT_VERSION,
         maxSegments: 3,
-        version: '1.2.3',
+        metadata: { format: EVENT_LOG_FORMAT, version: '1.2.3' },
         socket:
           process.platform === 'win32' ? pipeName : SESSION_FILES.liveSocket,
         ipcSocket:
@@ -225,7 +224,7 @@ describe('install session', () => {
       path.join(staleDir, SESSION_FILES.meta),
       JSON.stringify({
         pid: 9_999_999,
-        formatVersion: EVENT_LOG_FORMAT_VERSION,
+        metadata: { format: EVENT_LOG_FORMAT },
         startedAt: Date.now() - DEFAULT_RETAIN_MS - 1_000,
         command: 'stale',
         cwd: process.cwd(),
@@ -256,33 +255,6 @@ describe('install session', () => {
       expect(getSessionBaseDir()).toBe(EVENT_LOG_TMP_DIR);
     } finally {
       restoreDir();
-    }
-  });
-
-  it('ignores incompatible session metadata', async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
-    const sessionDir = path.join(dir, '123');
-    const restoreDir = setSessionDir(dir);
-    await fs.mkdir(sessionDir, { recursive: true });
-    await fs.writeFile(
-      path.join(sessionDir, SESSION_FILES.meta),
-      JSON.stringify({
-        pid: 123,
-        formatVersion: EVENT_LOG_FORMAT_VERSION + 1,
-        startedAt: Date.now(),
-        command: 'old',
-        cwd: process.cwd(),
-        socket: SESSION_FILES.liveSocket,
-        ipcSocket: SESSION_FILES.ipcSocket,
-      })
-    );
-
-    try {
-      const { readMetaSync } = await import('../discovery');
-      expect(readMetaSync(sessionDir)).toBeNull();
-    } finally {
-      restoreDir();
-      await fs.rm(dir, { recursive: true, force: true });
     }
   });
 
@@ -422,8 +394,10 @@ describe('install explicit file target', () => {
         vi.resetModules();
         const { installEventLogger, flushEventLogger } =
           await import('../install');
-        installEventLogger(version == null ? undefined : { version });
-        installEventLogger({ version: '9.9.9' });
+        installEventLogger(
+          version == null ? undefined : { metadata: { version } }
+        );
+        installEventLogger({ metadata: { version: '9.9.9' } });
         await flushEventLogger();
         const lines = (await fs.readFile(file, 'utf8'))
           .trim()
@@ -432,9 +406,10 @@ describe('install explicit file target', () => {
         expect(lines).toEqual([
           expect.objectContaining({
             _e: 'root:init',
-            version: version ?? 'UNVERSIONED',
           }),
         ]);
+        expect(lines[0].version).toBe(version);
+        expect(lines[0]).not.toHaveProperty('metadata');
       } finally {
         const sink = eventLogState.primarySink as LogStream | undefined;
         const closed =

@@ -4,15 +4,10 @@ import type { Readable } from 'node:stream';
 import { parseArgs } from 'node:util';
 
 import { detectRotationLoss } from '../tap';
-import type { ListedSession } from '../sessions';
 import {
-  compileEventFilter,
-  matchesTapOptions,
   parseEventLine,
-  parseSince,
   parseDuration as parseDurationValue,
 } from '../utils/eventFilter';
-import type { ParsedEvent } from '../types';
 
 export const tapArgOptions = {
   since: { type: 'string' },
@@ -41,12 +36,6 @@ export async function warnOnRotationLoss(sessionDir: string, remedy: string) {
   );
 }
 
-export function formatSessionProcessName(session: ListedSession) {
-  return session.version
-    ? `${session.command} (v${session.version}, PID ${session.pid})`
-    : `${session.command} (PID ${session.pid})`;
-}
-
 export async function* readJsonlFile(file: string) {
   yield* readJsonlStream(fs.createReadStream(file, { encoding: 'utf8' }));
 }
@@ -59,32 +48,9 @@ export async function* readJsonlStream(stream: Readable) {
   const rl = createInterface({ input: stream });
   for await (const line of rl) {
     if (!line) continue;
-    // Lossless parse; the debug decision belongs to filterEvents
+    // Lossless parse; filtering belongs to the converters
     const event = parseEventLine(line, { debug: true });
     if (event) yield event;
-  }
-}
-
-export async function* filterEvents(
-  events: AsyncIterable<ParsedEvent> | Iterable<ParsedEvent>,
-  options: Pick<SharedTapOptions, 'since' | 'filter' | 'spans' | 'debug'>
-) {
-  const eventFilter = compileEventFilter(options.filter);
-  const since = parseSince(options.since);
-  for await (const event of events) {
-    if (
-      matchesTapOptions(
-        event,
-        {
-          filter: options.filter,
-          since,
-          spans: options.spans,
-          debug: options.debug,
-        },
-        eventFilter
-      )
-    )
-      yield event;
   }
 }
 

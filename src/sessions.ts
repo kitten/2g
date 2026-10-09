@@ -9,16 +9,16 @@ import {
   readMetaSync,
 } from './discovery';
 import type { SessionMeta } from './session';
+import type { EventLoggerMetadata } from './types';
 
 export interface ListedSession {
   id: string;
   pid: number;
-  formatVersion: number;
   alive: boolean;
   startedAt: number;
   command: string;
   cwd: string;
-  version?: string;
+  metadata: EventLoggerMetadata;
   origin?: SessionMeta['origin'];
   sessionDir: string;
 }
@@ -45,12 +45,11 @@ export async function listSessions(
     sessions.push({
       id: entry.name,
       pid: meta.pid,
-      formatVersion: meta.formatVersion,
       alive: false,
       startedAt: meta.startedAt,
       command: meta.command,
       cwd: meta.cwd,
-      version: meta.version,
+      metadata: meta.metadata,
       origin: meta.origin,
       sessionDir,
     });

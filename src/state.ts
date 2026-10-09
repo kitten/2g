@@ -1,4 +1,5 @@
 import { EVENT_LOG_STATE_VERSION } from './constants';
+import type { EventLoggerMetadata } from './types';
 import type { EventSink } from './utils/logStream';
 import type { EventMeta } from './utils/serializeEvent';
 
@@ -14,6 +15,7 @@ export interface EventLoggerInfo {
 export interface EventLogState {
   logPath: string;
   primarySink?: EventSink;
+  updateMetadata?: (patch: EventLoggerMetadata) => void;
   eventMeta?: EventMeta;
   eventLoggerInfo: EventLoggerInfo | null;
   debug: boolean;
@@ -31,6 +33,7 @@ export function _resetEventLogState() {
   eventLogState.primarySink?.destroy();
   eventLogState.logPath = process.cwd();
   eventLogState.primarySink = undefined;
+  eventLogState.updateMetadata = undefined;
   eventLogState.eventMeta = undefined;
   eventLogState.eventLoggerInfo = null;
   eventLogState.debug = false;

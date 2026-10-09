@@ -3,10 +3,12 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { LogStream } from '../logStream';
-import { openIpc } from '../ipc';
+import { openIpc, ingestIpcSocket } from '../ipc';
+import { EventEmitter } from 'node:events';
+import type { EventSink } from '../logStream';
 
 describe('openIpc', () => {
   it('buffers all lines until the socket accepts a connection', async () => {
@@ -153,3 +155,33 @@ async function waitFor(predicate: () => boolean) {
   }
   throw new Error('Timed out waiting for condition');
 }
+
+it('forwards split and batched metadata without parsing events', () => {
+  const socket = new EventEmitter() as net.Socket;
+  socket.unref = () => socket;
+  socket.setEncoding = () => socket;
+  const writes: string[] = [];
+  const sink = {
+    _writeln: (line: string) => {
+      writes.push(line);
+      return true;
+    },
+  } as EventSink;
+  ingestIpcSocket(socket, sink);
+  const parse = vi.spyOn(JSON, 'parse');
+  try {
+    socket.emit(
+      'data',
+      '{"_e":"root:init","_t":1,"port":8081}\n{"_e":"root:up'
+    );
+    expect(writes).toEqual(['{"_e":"root:init","_t":1,"port":8081}\n']);
+    const tail =
+      'date","_t":2,"_w":"child","ready":true}\n{"_e":"root:update",broken}\n{"_e":"custom:tick","_t":3,"message":"root:update"}\n{"_e":"root:update","_t":4,"port":8082}\n';
+    socket.emit('data', tail);
+    expect(writes).toHaveLength(2);
+    expect(writes[1]).toBe('{"_e":"root:up' + tail);
+    expect(parse).not.toHaveBeenCalled();
+  } finally {
+    parse.mockRestore();
+  }
+});

@@ -6,8 +6,6 @@ import { tap } from '../../tap';
 import type { ParsedEvent } from '../../types';
 import { redirectConsoleToStderr } from '../../utils/redirectConsole';
 import {
-  filterEvents,
-  formatSessionProcessName,
   parseHelp,
   parseDuration,
   parseSharedTapOptions,
@@ -30,17 +28,19 @@ export async function runExportCli(args: string[]) {
   const options = parseExportOptions(args);
   if (options.json) redirectConsoleToStderr();
   let events: AsyncIterable<ParsedEvent> | ParsedEvent[];
-  let processName: string | undefined;
+  let command: string | undefined;
   let exportPid: number | undefined;
+  let version: string | undefined;
 
   if (options.selector) {
     const session = await resolveSession(options.selector);
-    processName = formatSessionProcessName(session);
+    command = session.command;
     exportPid = session.pid;
+    version = session.metadata.version;
     await warnOnRotationLoss(session.sessionDir, '2g export --tail');
     events = tap(session.sessionDir, {
       follow: options.follow,
-      debug: options.debug,
+      debug: true,
       timeout: options.timeout,
       idleTimeout: options.follow ? options.idleTimeout : undefined,
     });
@@ -50,17 +50,11 @@ export async function runExportCli(args: string[]) {
     events = readJsonlStdin();
   }
 
-  const filteredEvents = filterEvents(events, options);
+  const exportOptions = { ...options, pid: exportPid, command, version };
   const file =
     options.format === 'opentelemetry'
-      ? await convertToOpenTelemetry(filteredEvents, {
-          pid: exportPid,
-          processName,
-        })
-      : await convertToChromeTrace(filteredEvents, {
-          pid: exportPid,
-          processName,
-        });
+      ? await convertToOpenTelemetry(events, exportOptions)
+      : await convertToChromeTrace(events, exportOptions);
   const output = JSON.stringify(file, null, 2);
   if (options.output) fs.writeFileSync(options.output, `${output}\n`);
   else process.stdout.write(`${output}\n`);

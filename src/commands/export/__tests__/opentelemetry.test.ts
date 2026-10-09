@@ -3,20 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { convertToOpenTelemetry } from '../opentelemetry';
 
 describe('opentelemetry', () => {
-  it('takes service metadata only from the root process', async () => {
+  it('does not replace supplied version with empty child metadata', async () => {
     const output = await convertToOpenTelemetry([
       {
         _e: 'root:init',
         _t: 950,
         _w: 'worker_thread:1',
-        version: 'UNVERSIONED',
       },
       { _e: 'root:init', _t: 900, version: '1.0.0' },
       {
         _e: 'root:init',
         _t: 975,
         _w: 'event_log_child:2',
-        version: 'UNVERSIONED',
       },
     ]);
     const resource = output.resourceSpans[0];
@@ -29,7 +27,10 @@ describe('opentelemetry', () => {
       value: { stringValue: '2g (v1.0.0)' },
     });
     expect(resource.scopeSpans[0].spans).toEqual([
-      expect.objectContaining({ name: '2g (v1.0.0)', events: undefined }),
+      expect.objectContaining({
+        name: '2g (v1.0.0)',
+        events: Array(3).fill(expect.objectContaining({ name: 'update' })),
+      }),
     ]);
   });
 
@@ -69,7 +70,12 @@ describe('opentelemetry', () => {
   it('maps 2g spans and instants to OTLP JSON resource spans', async () => {
     const output = await convertToOpenTelemetry(
       [
-        { _e: 'root:init', _t: 900, format: 'v0-jsonl', version: '1.0.0' },
+        {
+          _e: 'root:init',
+          _t: 900,
+
+          version: '1.0.0',
+        },
         { _e: 'env:mode', _t: 1000, mode: 'development' },
         { _e: 'metro:bundling:done', _t: 1500, _d: 250.25, id: 'a' },
       ],

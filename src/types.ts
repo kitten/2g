@@ -1,3 +1,5 @@
+import type { EVENT_LOG_FORMAT } from './constants';
+
 type Prettify<T> =
   T extends Record<string, unknown> ? { [K in keyof T]: T[K] } : T;
 
@@ -28,13 +30,29 @@ type ValidPayload<Payload> =
     ? Prettify<Payload>
     : never;
 
+export interface MetadataRegistry {
+  format?: typeof EVENT_LOG_FORMAT;
+  version?: string;
+}
+
+type JsonMetadata<T> = T extends string | number | boolean | null | undefined
+  ? T
+  : T extends (...args: any[]) => any
+    ? never
+    : T extends object
+      ? { [K in keyof T]: JsonMetadata<T[K]> }
+      : never;
+
+export type EventLoggerMetadata = {
+  [K in Exclude<keyof MetadataRegistry, ReservedPayloadKeys>]?: JsonMetadata<
+    MetadataRegistry[K]
+  >;
+};
+
 export interface EventRegistry {
   [key: `custom:${string}`]: Record<string, unknown>;
-  'root:init': {
-    format: 'v0-jsonl' | (string & {});
-    formatVersion: number;
-    version: string;
-  };
+  'root:update': EventLoggerMetadata;
+  'root:init': EventLoggerMetadata;
 }
 
 export type EventKeys = Extract<keyof EventRegistry, string>;
