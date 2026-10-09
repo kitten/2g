@@ -233,6 +233,8 @@ export class LogStream
           this.#flushPending
         ) {
           this.#writeLine();
+        } else if (this.#ending && !this.#writing) {
+          this.#close();
         }
       }
     };
@@ -330,9 +332,7 @@ export class LogStream
   _end() {
     if (!this.#destroyed && !this.#ending) {
       this.#ending = true;
-      if (this.#opening) {
-        this.once('ready', () => this._end());
-      } else if (!this.#writing && this.#fd >= 0) {
+      if (!this.#opening && !this.#writing && this.#fd >= 0) {
         if (this.#lines.length - this.#head > this.#partialLine) {
           this.#writeLine();
         } else {
