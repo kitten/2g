@@ -30,6 +30,7 @@ describe('export metadata', () => {
         ...filter,
         command: 'expo start',
         pid: 12,
+        version: 'fallback',
       };
       const trace = await convertToChromeTrace(events, options);
       expect(trace.metadata.version).toBe('2');

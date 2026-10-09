@@ -30,11 +30,13 @@ export async function runExportCli(args: string[]) {
   let events: AsyncIterable<ParsedEvent> | ParsedEvent[];
   let command: string | undefined;
   let exportPid: number | undefined;
+  let version: string | undefined;
 
   if (options.selector) {
     const session = await resolveSession(options.selector);
     command = session.command;
     exportPid = session.pid;
+    version = session.metadata.version;
     await warnOnRotationLoss(session.sessionDir, '2g export --tail');
     events = tap(session.sessionDir, {
       follow: options.follow,
@@ -48,7 +50,7 @@ export async function runExportCli(args: string[]) {
     events = readJsonlStdin();
   }
 
-  const exportOptions = { ...options, pid: exportPid, command };
+  const exportOptions = { ...options, pid: exportPid, command, version };
   const file =
     options.format === 'opentelemetry'
       ? await convertToOpenTelemetry(events, exportOptions)

@@ -10,6 +10,7 @@ export interface ExportOptions extends EventFilterOptions {
   processName?: string;
   command?: string;
   pid?: number;
+  version?: string;
 }
 
 export class ExportContext {
@@ -18,6 +19,7 @@ export class ExportContext {
   #eventOptions: Omit<EventFilterOptions, 'since'> & { since?: number };
 
   constructor(private readonly options: ExportOptions) {
+    this.version = options.version;
     this.#filter = compileEventFilter(options.filter);
     this.#eventOptions = { ...options, since: parseSince(options.since) };
   }
