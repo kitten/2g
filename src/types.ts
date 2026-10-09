@@ -28,12 +28,31 @@ type ValidPayload<Payload> =
     ? Prettify<Payload>
     : never;
 
+export interface MetadataRegistry {
+  version?: string;
+}
+
+type JsonMetadata<T> = T extends string | number | boolean | null | undefined
+  ? T
+  : T extends (...args: any[]) => any
+    ? never
+    : T extends object
+      ? { [K in keyof T]: JsonMetadata<T[K]> }
+      : never;
+
+export type EventLoggerMetadata = {
+  [K in Exclude<keyof MetadataRegistry, ReservedPayloadKeys>]?: JsonMetadata<
+    MetadataRegistry[K]
+  >;
+};
+
 export interface EventRegistry {
   [key: `custom:${string}`]: Record<string, unknown>;
+  'root:metadata': { metadata: EventLoggerMetadata };
   'root:init': {
     format: 'v0-jsonl' | (string & {});
     formatVersion: number;
-    version: string;
+    metadata?: EventLoggerMetadata;
   };
 }
 

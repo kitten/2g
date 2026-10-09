@@ -17,6 +17,8 @@ export type {
   EventKeys,
   EventLogger,
   EventRegistry,
+  MetadataRegistry,
+  EventLoggerMetadata,
   ParsedEvent,
   Serialized,
   SerializedError,
