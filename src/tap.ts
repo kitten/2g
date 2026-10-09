@@ -145,13 +145,16 @@ async function connectLive(
   if (!socket) return undefined;
   const rl = createInterface({ input: socket });
   const buffer: string[] = [];
-  const waiters: Array<(line: string | null) => void> = [];
+  let head = 0;
+  let waiter: ((line: string | null) => void) | undefined;
   let closed = false;
 
   const push = (line: string | null) => {
-    const waiter = waiters.shift();
-    if (waiter) waiter(line);
-    else if (line != null) buffer.push(line);
+    if (waiter) {
+      const resolve = waiter;
+      waiter = undefined;
+      resolve(line);
+    } else if (line != null) buffer.push(line);
   };
 
   const close = () => rl.close();
@@ -169,9 +172,20 @@ async function connectLive(
   return {
     buffer,
     next() {
-      if (buffer.length) return Promise.resolve(buffer.shift()!);
+      if (head < buffer.length) {
+        const line = buffer[head];
+        buffer[head++] = '';
+        if (head === buffer.length) {
+          buffer.length = 0;
+          head = 0;
+        } else if (head >= 1024 && head * 2 >= buffer.length) {
+          buffer.splice(0, head);
+          head = 0;
+        }
+        return Promise.resolve(line);
+      }
       if (closed) return Promise.resolve(null);
-      return new Promise<string | null>(resolve => waiters.push(resolve));
+      return new Promise<string | null>(resolve => (waiter = resolve));
     },
   };
 }
