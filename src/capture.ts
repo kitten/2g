@@ -9,6 +9,7 @@ import {
 import type { TapOptions } from './tap';
 import type { ParsedEvent } from './types';
 import { compileEventFilter, parseEventLine } from './utils/eventFilter';
+import { Queue } from './utils/queue';
 
 export type CaptureOptions = Pick<TapOptions, 'debug' | 'filter'>;
 
@@ -23,8 +24,7 @@ export class EventCapture implements AsyncIterable<ParsedEvent> {
   #index: number | undefined;
   #attached = false;
   #done = false;
-  #events: Array<ParsedEvent | null> = [];
-  #head = 0;
+  #events = new Queue<ParsedEvent>();
   #waiters: Array<(event: ParsedEvent | null) => void> = [];
 
   constructor(options: CaptureOptions = {}) {
@@ -122,19 +122,8 @@ export class EventCapture implements AsyncIterable<ParsedEvent> {
   }
 
   #next(): Promise<ParsedEvent | null> {
-    if (this.#head < this.#events.length) {
-      const event = this.#events[this.#head];
-      this.#events[this.#head++] = null;
-      if (this.#head === this.#events.length) {
-        this.#events.length = 0;
-        this.#head = 0;
-      } else if (this.#head >= 1024 && this.#head * 2 >= this.#events.length) {
-        // Release consumed slots without moving the pending tail per event.
-        this.#events = this.#events.slice(this.#head);
-        this.#head = 0;
-      }
-      return Promise.resolve(event);
-    }
+    const event = this.#events.shift();
+    if (event) return Promise.resolve(event);
     if (this.#done) return Promise.resolve(null);
     if (!this.#attached)
       throw new Error('captureEvents: attach() a child before iterating');
