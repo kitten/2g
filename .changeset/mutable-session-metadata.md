@@ -2,6 +2,6 @@
 '2g': minor
 ---
 
-Add typed, incrementally updated session metadata through `MetadataRegistry`, installation metadata, and `updateEventLoggerMetadata()`. Updates emit `root:metadata`, accumulate in the owning process’s `meta.json`, and appear in `ps` and API listings. Child metadata events are forwarded without parsing or updating the parent’s metadata. Exports retain metadata context when filtering events.
+Add typed session metadata and `updateEventLoggerMetadata()` to merge updates, emit `root:update`, and expose current metadata through `ps` and `list()`.
 
-Replace the top-level `version` option and init/session fields with optional `metadata.version`. Update callers to `installEventLogger({ metadata: { version } })`; the `UNVERSIONED` default and legacy version fallback are removed.
+Use `metadata.version` instead of top-level `version` in installation options and session listings. Remove the default version and `formatVersion`; store `format` in `meta.json.metadata`.

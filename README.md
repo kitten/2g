@@ -150,26 +150,16 @@ updateEventLoggerMetadata({
 updateEventLoggerMetadata({ ready: true });
 ```
 
-Both inputs are shallow partials of `MetadataRegistry`, defaulting to `{}`.
-Updates replace supplied keys; nested objects and arrays replace wholesale.
-Values must be JSON-compatible, with `null` allowed where declared and undefined
-omitted on serialization. Later writes may persist caller mutations to held objects.
+Both calls accept partial, JSON-compatible metadata. Updates merge shallowly:
+supplied keys replace previous values, including nested objects and arrays.
 
-Initial values appear in `root:init.metadata`; updates emit `root:metadata` with
-`{ metadata: patch }`. Local updates atomically rewrite the session's `meta.json`.
-`ps` shows a JSON `METADATA` column; `ps --json` and `list()` expose `metadata`.
-Children only forward events; explicit destinations create no session or sidecar.
-Disabled logging ignores updates, and serialization or file errors never throw
-into the application. Readers may see the last successfully persisted state.
+Initial values emit `root:init`; later patches emit `root:update`. Sessions persist
+their own metadata in `meta.json`, visible through `ps` and `list()`. Child updates
+do not change the parent's metadata. Top-level metadata keys starting with `_`
+are omitted when saving.
 
-For children already attached on import, use the update API: installation remains
-install-once. Types guide producers; consumers should prefilter sessions before
-interpreting their metadata. Event envelope keys remain excluded by the type.
-
-`metadata.version` replaces the top-level version option and init/session fields,
-without a default or legacy fallback. Exports derive version from the root process's
-recorded metadata, not child events or today's `meta.json`; rotated or filtered
-input may have incomplete metadata.
+Use `metadata.version` for the application version. Persisted metadata also includes
+`format: 'v0-jsonl'` automatically.
 
 ### Deferred payload helpers
 
