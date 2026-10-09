@@ -168,14 +168,14 @@ function eventAttributes(
   event: ParsedEvent,
   parsed: ReturnType<typeof splitEventName>
 ) {
-  const values: Record<string, unknown> = {
-    'event.name': event._e,
-  };
+  const result: OpenTelemetryAttribute[] = [];
+  addAttribute(result, 'event.name', event._e);
   if (parsed) {
-    values['event.category'] = parsed.category;
-    values['event.action'] = parsed.name;
+    addAttribute(result, 'event.category', parsed.category);
+    addAttribute(result, 'event.action', parsed.name);
   }
-  if (typeof event._w === 'string') values['event.worker.id'] = event._w;
+  if (typeof event._w === 'string')
+    addAttribute(result, 'event.worker.id', event._w);
 
   for (const key of Object.keys(event)) {
     if (
@@ -186,19 +186,27 @@ function eventAttributes(
       key === '_w'
     )
       continue;
-    values[`event_log.${key}`] = event[key];
+    addAttribute(result, `event_log.${key}`, event[key]);
   }
 
-  return attributes(values);
+  return result;
 }
 
 function attributes(values: Record<string, unknown>): OpenTelemetryAttribute[] {
   const result: OpenTelemetryAttribute[] = [];
   for (const [key, value] of Object.entries(values)) {
-    const converted = anyValue(value);
-    if (converted) result.push({ key, value: converted });
+    addAttribute(result, key, value);
   }
   return result;
+}
+
+function addAttribute(
+  result: OpenTelemetryAttribute[],
+  key: string,
+  value: unknown
+) {
+  const converted = anyValue(value);
+  if (converted) result.push({ key, value: converted });
 }
 
 function anyValue(value: unknown): OpenTelemetryAnyValue | null {
@@ -211,14 +219,12 @@ function anyValue(value: unknown): OpenTelemetryAnyValue | null {
       : { doubleValue: value };
   }
   if (Array.isArray(value)) {
-    return {
-      arrayValue: {
-        values: value.flatMap(item => {
-          const converted = anyValue(item);
-          return converted ? [converted] : [];
-        }),
-      },
-    };
+    const values: OpenTelemetryAnyValue[] = [];
+    value.forEach(item => {
+      const converted = anyValue(item);
+      if (converted) values.push(converted);
+    });
+    return { arrayValue: { values } };
   }
   if (value && typeof value === 'object') {
     return {
