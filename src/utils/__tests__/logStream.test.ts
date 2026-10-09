@@ -8,6 +8,34 @@ import { describe, expect, it, vi } from 'vitest';
 import { LogStream, type LogStreamDrain } from '../logStream';
 
 describe('logStream', () => {
+  it.each(['Buffer', 'Uint8Array'])(
+    'decodes only the supplied %s view before returning from write',
+    async kind => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-view-'));
+      const file = path.join(dir, 'events.jsonl');
+      const stream = new LogStream(file);
+      const text = '漢😀\n';
+      const storage = Buffer.from(`prefix${text}suffix`);
+      const slice = storage.subarray(6, 6 + Buffer.byteLength(text));
+      const view =
+        kind === 'Buffer'
+          ? slice
+          : new Uint8Array(slice.buffer, slice.byteOffset, slice.byteLength);
+      const written = vi.fn();
+      try {
+        stream.write(view, written);
+        expect(written).toHaveBeenCalledOnce();
+        // The caller may reuse its backing storage as soon as write returns.
+        storage.fill(0);
+        await new Promise<void>(resolve => stream.end(resolve));
+        expect(await fs.readFile(file, 'utf8')).toBe(text);
+      } finally {
+        stream.destroy();
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('flushes complete blocks while retaining and joining partial tails', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-block-'));
     const file = path.join(dir, 'events.jsonl');
