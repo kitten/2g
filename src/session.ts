@@ -172,7 +172,12 @@ function trackSegmentRotation(
     bytesWritten += written;
     if (bytesWritten < maxSegmentSize) return;
     bytesWritten = 0;
-    rotateSegments(sessionDir, maxSegments);
+    try {
+      rotateSegments(sessionDir, maxSegments);
+    } catch {
+      // Keep the current segment open and retry after another segment's worth.
+      return;
+    }
     stream.reopen();
   });
 }

@@ -1,4 +1,4 @@
-import { closeSync, existsSync, openSync } from 'node:fs';
+import fsSync, { closeSync, existsSync, openSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -26,6 +26,58 @@ import { openIpc } from '../utils/ipc';
 import { LogStream } from '../utils/logStream';
 
 describe('install session', () => {
+  it.each(['EACCES', 'EBUSY'])(
+    'continues logging and resumes rotation after removal fails with %s',
+    async code => {
+      const dir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'event-log-session-')
+      );
+      const restoreDir = setSessionDir(dir);
+      const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+      const session = createSession({ maxSegments: 2, maxSegmentSize: 1 });
+      const current = path.join(session.sessionDir, '0.jsonl');
+      const oldest = path.join(session.sessionDir, '1.jsonl');
+      const rmSync = fsSync.rmSync;
+      const remove = vi
+        .spyOn(fsSync, 'rmSync')
+        .mockImplementation((file, options) => {
+          if (file === oldest) throw Object.assign(new Error(code), { code });
+          return rmSync(file, options);
+        });
+      const flush = () =>
+        new Promise<void>((resolve, reject) =>
+          session.sink.flush!(error => (error ? reject(error) : resolve()))
+        );
+      const first = '{"_e":"test:first","_t":1}\n';
+      const second = '{"_e":"test:second","_t":2}\n';
+      const third = '{"_e":"test:third","_t":3}\n';
+
+      try {
+        await fs.writeFile(oldest, 'old\n');
+        session.sink._writeln(first);
+        await flush();
+        session.sink._writeln(second);
+        await flush();
+        expect(await fs.readFile(current, 'utf8')).toBe(first + second);
+        expect(await fs.readFile(oldest, 'utf8')).toBe('old\n');
+        expect(session.sink.writable).toBe(true);
+
+        remove.mockRestore();
+        session.sink._writeln(third);
+        await flush();
+        expect(await fs.readFile(oldest, 'utf8')).toBe(first + second + third);
+        expect(await fs.readFile(current, 'utf8')).toBe('');
+      } finally {
+        remove.mockRestore();
+        await new Promise<void>(resolve => session.sink.end(resolve));
+        session.destroy();
+        restoreDir();
+        restoreIpc();
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it('retains the newest events when a burst rotates through the entire ring', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-session-'));
     const restoreDir = setSessionDir(dir);
