@@ -30,8 +30,7 @@ describe('serializeEvent', () => {
       },
       'metro',
       'bundling:done',
-      { id: '1', platform: 'ios' },
-      { id: '2', total: 42 },
+      { id: '2', platform: 'ios', total: 42 },
       12.5,
       { _w: 'w1' }
     );
@@ -92,7 +91,7 @@ describe('serializeEvent', () => {
 
     expect(() => writeEvent(sink, 'metro', 'bad', circular)).not.toThrow();
     expect(() =>
-      writeCompleteEvent(sink, 'metro', 'bad:done', circular, undefined, 1)
+      writeCompleteEvent(sink, 'metro', 'bad:done', circular, 1)
     ).not.toThrow();
     expect(lines).toHaveLength(0);
   });

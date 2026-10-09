@@ -60,7 +60,6 @@ function createEventLogger<const Category extends string>(
         category,
         event,
         data,
-        undefined,
         performance.now() - start,
         eventLogState.eventMeta,
         level
