@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { getEventListeners } from 'node:events';
+import { getEventListeners, once } from 'node:events';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,8 +17,68 @@ import { detectRotationLoss, tap } from '../tap';
 import { listSessions, resolveSession } from '../sessions';
 import { parseEventLine, parseSince } from '../utils/eventFilter';
 import type { ParsedEvent } from '../types';
+import { openLiveTap } from './fixtures/liveTap';
 
 describe('tap', () => {
+  it('drains a closed live backlog in order while filtering invalid and debug lines', async () => {
+    const live = await openLiveTap({ filter: 'test' });
+    const rows = Array.from({ length: 6000 }, (_, i) => ({
+      _e: 'test:row',
+      _t: i,
+      i,
+    }));
+    const final = { _e: 'test:final', _t: 6000 };
+    const input = [
+      ...rows.map(row => JSON.stringify(row)),
+      '',
+      'invalid json',
+      '{"_e":"other:row","_t":6000}',
+      '{"_e":"test:debug","_t":6000,"_l":1}',
+      JSON.stringify(final),
+      JSON.stringify(final),
+    ].join('\n');
+    try {
+      const first = live.iterator.next();
+      const closed = once(live.socket, 'close');
+      live.socket.end(input);
+      const received = [(await first).value];
+      // Let the socket finish while consumption is paused, leaving a backlog.
+      await closed;
+      for (;;) {
+        const next = await live.iterator.next();
+        if (next.done) break;
+        received.push(next.value);
+      }
+      expect(received).toEqual([...rows, final, final]);
+    } finally {
+      await live.close();
+    }
+  });
+
+  it('reuses an emptied live queue and resumes a waiting consumer', async () => {
+    const live = await openLiveTap();
+    try {
+      for (let batch = 0; batch < 2; batch++) {
+        const rows = Array.from({ length: 4096 }, (_, i) => ({
+          _e: 'test:row',
+          _t: batch * 4096 + i,
+        }));
+        const first = live.iterator.next();
+        live.socket.write(rows.map(row => JSON.stringify(row) + '\n').join(''));
+        const received = [(await first).value];
+        for (let i = 1; i < rows.length; i++) {
+          received.push((await live.iterator.next()).value);
+        }
+        expect(received).toEqual(rows);
+      }
+      const pending = live.iterator.next();
+      live.socket.end();
+      expect((await pending).done).toBe(true);
+    } finally {
+      await live.close();
+    }
+  });
+
   it.each([
     ['history', true, false],
     ['buffered', true, false],

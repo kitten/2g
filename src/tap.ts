@@ -14,6 +14,7 @@ import {
   type EventFilterOptions,
 } from './utils/eventFilter';
 import { resolveSocketPath } from './utils/sessionSockets';
+import { Queue } from './utils/queue';
 
 export interface TapOptions extends EventFilterOptions {
   follow?: boolean;
@@ -55,7 +56,9 @@ export async function* tap(
       idleTimer = setAbortTimer(abort, options.idleTimeout);
     }
 
-    for (const line of live.buffer.splice(0)) {
+    // New arrivals belong to live delivery, after this buffered snapshot.
+    for (let remaining = live.buffer.length; remaining > 0; remaining--) {
+      const line = live.buffer.shift()!;
       const event = parseEventLine(line, options, eventFilter, since);
       if (event) {
         idleTimer?.refresh();
@@ -144,14 +147,16 @@ async function connectLive(
   const socket = await connectWithRetry(socketPath, signal);
   if (!socket) return undefined;
   const rl = createInterface({ input: socket });
-  const buffer: string[] = [];
-  const waiters: Array<(line: string | null) => void> = [];
+  const buffer = new Queue<string>();
+  let waiter: ((line: string | null) => void) | undefined;
   let closed = false;
 
   const push = (line: string | null) => {
-    const waiter = waiters.shift();
-    if (waiter) waiter(line);
-    else if (line != null) buffer.push(line);
+    if (waiter) {
+      const resolve = waiter;
+      waiter = undefined;
+      resolve(line);
+    } else if (line != null) buffer.push(line);
   };
 
   const close = () => rl.close();
@@ -169,9 +174,10 @@ async function connectLive(
   return {
     buffer,
     next() {
-      if (buffer.length) return Promise.resolve(buffer.shift()!);
+      const line = buffer.shift();
+      if (line !== undefined) return Promise.resolve(line);
       if (closed) return Promise.resolve(null);
-      return new Promise<string | null>(resolve => waiters.push(resolve));
+      return new Promise<string | null>(resolve => (waiter = resolve));
     },
   };
 }
