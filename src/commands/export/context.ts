@@ -33,14 +33,14 @@ export class ExportContext {
 
   read(event: ParsedEvent): ParsedEvent | undefined {
     const patch =
-      event._e === 'root:init' || event._e === 'root:metadata'
+      event._e === 'root:init' || event._e === 'root:update'
         ? event
         : undefined;
     if (!event._w && patch && Object.hasOwn(patch, 'version'))
       this.version =
         typeof patch.version === 'string' ? patch.version : undefined;
     if (!matchesTapOptions(event, this.#eventOptions, this.#filter)) return;
-    if (event._e === 'root:init') return { ...event, _e: 'root:metadata' };
+    if (event._e === 'root:init') return { ...event, _e: 'root:update' };
     return event;
   }
 }

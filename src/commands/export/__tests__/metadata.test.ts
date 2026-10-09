@@ -5,9 +5,9 @@ import type { ExportOptions } from '../context';
 
 const events = [
   { _e: 'root:init', _t: 1000, version: '1', port: 8081 },
-  { _e: 'root:metadata', _t: 1050, version: '2' },
+  { _e: 'root:update', _t: 1050, version: '2' },
   {
-    _e: 'root:metadata',
+    _e: 'root:update',
     _t: 1100,
     _w: 'child:1',
     version: 'child',
@@ -80,9 +80,9 @@ describe('export metadata', () => {
   it('does not recover missing version from child metadata', async () => {
     const incomplete = [
       { _e: 'root:init', _t: 1 },
-      { _e: 'root:metadata', _t: 2, port: 8081 },
+      { _e: 'root:update', _t: 2, port: 8081 },
       {
-        _e: 'root:metadata',
+        _e: 'root:update',
         _t: 3,
         _w: 'child',
         version: 'child',

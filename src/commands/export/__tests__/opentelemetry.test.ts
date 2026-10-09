@@ -29,7 +29,7 @@ describe('opentelemetry', () => {
     expect(resource.scopeSpans[0].spans).toEqual([
       expect.objectContaining({
         name: '2g (v1.0.0)',
-        events: Array(3).fill(expect.objectContaining({ name: 'metadata' })),
+        events: Array(3).fill(expect.objectContaining({ name: 'update' })),
       }),
     ]);
   });

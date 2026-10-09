@@ -168,7 +168,7 @@ function createPrimarySink(
 export function updateEventLoggerMetadata(patch: EventLoggerMetadata): void {
   if (!eventLogState.primarySink?.writable) return;
   eventLogState.updateMetadata?.(patch);
-  rootEvent('metadata', patch);
+  rootEvent('update', patch);
 }
 
 function activateSink(

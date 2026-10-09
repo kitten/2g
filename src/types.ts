@@ -51,7 +51,7 @@ export type EventLoggerMetadata = {
 
 export interface EventRegistry {
   [key: `custom:${string}`]: Record<string, unknown>;
-  'root:metadata': EventLoggerMetadata;
+  'root:update': EventLoggerMetadata;
   'root:init': EventLoggerMetadata;
 }
 

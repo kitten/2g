@@ -80,7 +80,7 @@ it('initializes metadata in the session and root:init exactly once', async () =>
 it('persists shallow patches and later caller mutations without altering identity', async () => {
   const ctx = start(JSON.parse('{"version":"1","__proto__":{"custom":true}}'));
   const metadata = ctx.meta.metadata!;
-  const event = { _e: 'root:metadata', _t: 1, _private: true, port: 8080 };
+  const event = { _e: 'root:update', _t: 1, _private: true, port: 8080 };
   ctx.updateMetadata(event);
   expect(metadata).toMatchObject(event);
   Object.assign(metadata, { _later: true });
@@ -126,7 +126,7 @@ it('persists shallow patches and later caller mutations without altering identit
   expect((await listSessions())[0].metadata).toEqual(expected);
   const lines = await readEvents();
   expect(lines[0]).toMatchObject({
-    _e: 'root:metadata',
+    _e: 'root:update',
     nested: { enabled: true },
     list: [1, 2],
   });
@@ -209,7 +209,7 @@ it("forwards child metadata without changing the parent's persisted metadata", a
   });
   const metadata = { version: 'child', port: 8081 };
   const line = JSON.stringify({
-    _e: 'root:metadata',
+    _e: 'root:update',
     _t: 1,
     _w: 'child',
     ...metadata,
@@ -241,7 +241,7 @@ it('records metadata patches to explicit destinations without creating sessions'
   expect(await fs.readdir(dir)).toEqual(['explicit.jsonl']);
   expect(lines[0]._e).toBe('root:init');
   expect(lines[1]).toMatchObject({
-    _e: 'root:metadata',
+    _e: 'root:update',
     port: 8081,
   });
 });

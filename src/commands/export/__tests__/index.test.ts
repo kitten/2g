@@ -155,7 +155,7 @@ describe('export command', () => {
         JSON.stringify({ _e: 'env:info', _t: 1000 }),
         JSON.stringify({ _e: 'server:error', _t: 1100 }),
         JSON.stringify({
-          _e: 'root:metadata',
+          _e: 'root:update',
           _t: 1200,
           version: '2',
         }),
