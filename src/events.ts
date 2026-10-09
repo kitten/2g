@@ -67,29 +67,31 @@ function createEventLogger<const Category extends string>(
     };
   };
 
-  log.path = function relativePath(target: string | undefined | null) {
-    return {
-      toJSON(): string | null {
-        try {
-          return target != null && path.isAbsolute(target)
-            ? path
-                .relative(eventLogState.logPath, target)
-                .replace(/\\/g, '/') || '.'
-            : (target ?? null);
-        } catch {
-          return target || null;
-        }
-      },
-    };
-  };
-
-  log.error = function error(error: unknown) {
-    return {
-      toJSON: () => serializeError(error),
-    };
-  };
+  log.path = relativePath;
+  log.error = error;
   log.category = category;
   return log as EventLogger<Category>;
+}
+
+function relativePath(target: string | undefined | null) {
+  return {
+    toJSON(): string | null {
+      try {
+        return target != null && path.isAbsolute(target)
+          ? path.relative(eventLogState.logPath, target).replace(/\\/g, '/') ||
+              '.'
+          : (target ?? null);
+      } catch {
+        return target || null;
+      }
+    },
+  };
+}
+
+function error(error: unknown) {
+  return {
+    toJSON: () => serializeError(error),
+  };
 }
 
 export function events<const Category extends string>(
