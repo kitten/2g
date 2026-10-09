@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
 import { ExportContext, type ExportOptions } from './context';
+import { splitEventName, stripSuffix } from './eventName';
 import type { ParsedEvent } from '../../types';
 
 export interface ConvertToOpenTelemetryOptions extends ExportOptions {}
@@ -50,8 +51,6 @@ type OpenTelemetryAnyValue =
   | { boolValue: boolean }
   | { arrayValue: { values: OpenTelemetryAnyValue[] } }
   | { kvlistValue: { values: OpenTelemetryAttribute[] } };
-
-const STRIP_SUFFIXES = [':started', ':done', ':failed'];
 
 export async function convertToOpenTelemetry(
   events: Iterable<ParsedEvent> | AsyncIterable<ParsedEvent>,
@@ -237,20 +236,4 @@ function createSpanId() {
 
 function unixNano(timeMs: number) {
   return BigInt(Math.round(timeMs * 1_000_000));
-}
-
-function splitEventName(value: string) {
-  const index = value.indexOf(':');
-  if (index < 1) return null;
-  return {
-    category: value.slice(0, index),
-    name: value.slice(index + 1),
-  };
-}
-
-function stripSuffix(name: string) {
-  for (const suffix of STRIP_SUFFIXES) {
-    if (name.endsWith(suffix)) return name.slice(0, -suffix.length);
-  }
-  return name;
 }

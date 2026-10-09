@@ -1,4 +1,5 @@
 import { ExportContext, type ExportOptions } from './context';
+import { splitEventName, stripSuffix } from './eventName';
 import type { ParsedEvent } from '../../types';
 
 export interface ConvertToChromeTraceOptions extends ExportOptions {}
@@ -45,8 +46,6 @@ export interface TraceMetadata {
   tid?: number;
   args: Record<string, unknown>;
 }
-
-const STRIP_SUFFIXES = [':started', ':done', ':failed'];
 
 export async function convertToChromeTrace(
   events: Iterable<ParsedEvent> | AsyncIterable<ParsedEvent>,
@@ -102,7 +101,10 @@ export class TraceConverter {
     const event = this.#context.read(input);
     if (!event) return;
 
-    const parsed = splitEventName(event._e);
+    const parsed = splitEventName(event._e) ?? {
+      category: 'uncategorized',
+      name: event._e,
+    };
     const track = this.#getTrack(
       parsed.category,
       typeof event._w === 'string' ? event._w : undefined
@@ -259,22 +261,6 @@ function assignLanes(spans: PendingSpan[]) {
     span.lane = lane;
   }
   return lanes.length;
-}
-
-function splitEventName(value: string) {
-  const index = value.indexOf(':');
-  if (index < 1) return { category: 'uncategorized', name: value };
-  return {
-    category: value.slice(0, index),
-    name: value.slice(index + 1),
-  };
-}
-
-function stripSuffix(name: string) {
-  for (const suffix of STRIP_SUFFIXES) {
-    if (name.endsWith(suffix)) return name.slice(0, -suffix.length);
-  }
-  return name;
 }
 
 function extractArgs(event: ParsedEvent) {

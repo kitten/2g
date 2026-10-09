@@ -1,9 +1,5 @@
 import { LOG_DEBUG_ENV } from './constants';
-import {
-  compileEventFilter,
-  matchesTapOptions,
-  parseEventLine,
-} from './utils/eventFilter';
+import { compileEventFilter, parseEventLine } from './utils/eventFilter';
 import type { EventSink } from './utils/logStream';
 import { formatPrettyEvent, shouldColorizeStream } from './utils/pretty';
 
@@ -27,9 +23,8 @@ export function createDebugSink(
         start = end + 1;
         if (!line) continue;
         // LOG_DEBUG is itself the debug opt-in
-        const event = parseEventLine(line, { debug: true });
-        if (!event || !matchesTapOptions(event, { debug: true }, filter))
-          continue;
+        const event = parseEventLine(line, { debug: true }, filter);
+        if (!event) continue;
         process.stderr.write(
           `${formatPrettyEvent(event, {
             colorize,
