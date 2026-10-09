@@ -88,18 +88,32 @@ describe('trace', () => {
 
   it('assigns lanes per worker track independently', async () => {
     const trace = await convertToChromeTrace([
+      { _e: 'env:mode', _t: 10 },
       { _e: 'metro:a:done', _t: 100, _d: 100, _w: 'w1' },
-      { _e: 'metro:b:done', _t: 150, _d: 100, _w: 'w1' },
       { _e: 'metro:c:done', _t: 150, _d: 100 },
+      { _e: 'metro:progress', _t: 75, _w: 'w1' },
+      { _e: 'metro:b:done', _t: 150, _d: 100, _w: 'w1' },
     ]);
 
     const threads = trace.traceEvents.filter(
       event => event.ph === 'M' && event.name === 'thread_name'
     );
     expect(threads.map(event => event.args)).toEqual([
+      { name: 'env' },
       { name: 'metro w1' },
       { name: 'metro w1 #2' },
       { name: 'metro' },
+    ]);
+    expect(
+      trace.traceEvents
+        .filter(event => event.ph !== 'M')
+        .map(event => ({ name: event.name, tid: event.tid }))
+    ).toEqual([
+      { name: 'mode', tid: 1 },
+      { name: 'a', tid: 2 },
+      { name: 'c', tid: 4 },
+      { name: 'progress', tid: 2 },
+      { name: 'b', tid: 3 },
     ]);
   });
 

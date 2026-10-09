@@ -128,8 +128,14 @@ export class TraceConverter {
 
   toTraceFile(): TraceFile {
     let base = this.#pending.length ? Infinity : 0;
+    const spansByTrack = new Map<string, PendingSpan[]>();
     for (const event of this.#pending) {
       if (event.ts < base) base = event.ts;
+      if (event.kind === 'span') {
+        let spans = spansByTrack.get(event.track);
+        if (!spans) spansByTrack.set(event.track, (spans = []));
+        spans.push(event);
+      }
     }
     const traceEvents: TraceEvent[] = [
       {
@@ -143,10 +149,7 @@ export class TraceConverter {
     const tids = new Map<string, number>();
     let nextTid = 1;
     for (const [track, displayName] of this.#tracks) {
-      const spans: PendingSpan[] = [];
-      for (const event of this.#pending) {
-        if (event.kind === 'span' && event.track === track) spans.push(event);
-      }
+      const spans = spansByTrack.get(track) ?? [];
       const laneCount = Math.max(assignLanes(spans), 1);
       for (let lane = 0; lane < laneCount; lane++) {
         const tid = nextTid++;
