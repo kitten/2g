@@ -1,5 +1,12 @@
 # 2g
 
+## 1.0.1
+
+### Patch Changes
+
+- Rebase `log.path` onto the working directory instead of the log destination directory
+  Submitted by [@kitten](https://github.com/kitten) (See [#54](https://github.com/kitten/2g/pull/54))
+
 ## 1.0.0
 
 ### Major Changes
