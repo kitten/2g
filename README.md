@@ -167,12 +167,12 @@ stores `format: 'v0-jsonl'` at the top level, separate from application metadata
 
 ### Deferred payload helpers
 
-`log.path(absolutePath)` logs paths relative to the log target, and `log.error(error)`
-serializes an error to `{ name, message, code, stack, cause }`. Both return
-`Serialized<T>` wrappers — `{ toJSON(): T }` — that only do their work when an event is
-written, so disabled loggers skip `path.relative` calls and `error.stack`
-materialization entirely. Payloads accept `Serialized<T>` wherever their declared types
-expect `T`, so `EventRegistry` declarations keep using the wire shapes.
+`log.path(absolutePath)` logs paths relative to the working directory, and
+`log.error(error)` serializes an error to `{ name, message, code, stack, cause }`. Both
+return `Serialized<T>` wrappers that only do their work when an event is written,
+so disabled loggers skip `path.relative` calls and `error.stack` materialization entirely.
+Payloads accept `Serialized<T>` wherever their declared types expect `T`,
+so `EventRegistry` declarations keep using the wire shapes.
 
 ### Typed events
 
@@ -269,8 +269,9 @@ helpers:
 - `log(event, data?)`: writes a `category:event` line with the payload
 - `log.span()`: starts a span; returns an `end(event, data?)` function that writes a single
   event carrying the duration as `_d` (name the event `:done`/`:failed` at the end)
-- `log.path(target)`: returns a `Serialized<string>` of the path relative to the log
-  target
+- `log.path(target)`: returns a `Serialized<string>` of the path relative to the working
+  directory. A target far outside that directory, and a target that is already relative,
+  stay unchanged
 - `log.error(error)`: returns a `Serialized<SerializedError>` of
   `{ name, message, code, stack, cause }`, with cause chains serialized recursively
 - `log.category`: the category string
