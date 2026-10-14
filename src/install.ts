@@ -72,14 +72,8 @@ export function installEventLogger(
     );
 
   if (explicitTarget != null) {
-    let destination: string | number;
-    if (typeof explicitTarget === 'number') {
-      destination = explicitTarget;
-      redirectConsoleForFd(destination);
-    } else {
-      destination = explicitTarget.file;
-      eventLogState.logPath = explicitTarget.dir;
-    }
+    const destination = explicitTarget;
+    if (typeof destination === 'number') redirectConsoleForFd(destination);
     eventLogState.debug = options?.debug ?? true;
     eventLogState.eventLoggerInfo =
       typeof destination === 'number'
@@ -109,7 +103,6 @@ export function installEventLogger(
   if (options && options.session !== false) {
     eventLogState.debug = options.debug ?? !!process.env[LOG_DEBUG_ENV];
     const session = createSession(options);
-    eventLogState.logPath = session.sessionDir;
     eventLogState.eventLoggerInfo = {
       destination: 'session',
       isUserVisibleOutput: false,
@@ -143,11 +136,7 @@ function parseLogTarget(target: string | number | undefined) {
   if (`${fd}` === target && fd > 0 && Number.isSafeInteger(fd)) return fd;
 
   try {
-    const parsedPath = path.parse(target);
-    return {
-      file: path.format(parsedPath),
-      dir: parsedPath.dir || process.cwd(),
-    };
+    return path.resolve(target);
   } catch {
     return undefined;
   }
