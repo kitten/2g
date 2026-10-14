@@ -63,7 +63,7 @@ export function installEventLogger(
     return;
   }
 
-  const explicitTarget =
+  const destination =
     parseLogTarget(process.env[LOG_EVENTS_ENV]) ??
     parseLogTarget(
       typeof targetOrOptions === 'string' || typeof targetOrOptions === 'number'
@@ -71,8 +71,7 @@ export function installEventLogger(
         : undefined
     );
 
-  if (explicitTarget != null) {
-    const destination = explicitTarget;
+  if (destination != null) {
     if (typeof destination === 'number') redirectConsoleForFd(destination);
     eventLogState.debug = options?.debug ?? true;
     eventLogState.eventLoggerInfo =
