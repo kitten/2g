@@ -293,7 +293,34 @@ describe('api', () => {
     }
   });
 
-  it('keeps path helper output relative to the log target directory', async () => {
+  it('keeps path helper output relative to the working directory', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-path-'));
+    const restoreDir = setSessionDir(dir);
+    const restoreIpc = setEnv(INTERNAL_IPC_ENV, undefined);
+    const restoreLog = setEnv(LOG_EVENTS_ENV, undefined);
+    vi.resetModules();
+
+    try {
+      const { events } = await import('../events');
+      const { installEventLogger } = await import('../install');
+      installEventLogger({ command: 'session' });
+      const log = events('root');
+      // The session directory lives in the tmpdir and must not become the base
+      expect(json(log.path(path.join(process.cwd(), 'src', 'App.tsx')))).toBe(
+        'src/App.tsx'
+      );
+      expect(json(log.path(path.join(process.cwd(), '..', 'sibling.ts')))).toBe(
+        '../sibling.ts'
+      );
+    } finally {
+      restoreDir();
+      restoreIpc();
+      restoreLog();
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps paths far outside the working directory absolute', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'event-log-path-'));
     const logFile = path.join(dir, 'events.jsonl');
     const restoreLog = setEnv(LOG_EVENTS_ENV, logFile);
@@ -303,19 +330,12 @@ describe('api', () => {
       const { events } = await import('../events');
       const { installEventLogger } = await import('../install');
       installEventLogger();
-      await waitFor(async () => {
-        try {
-          await fs.stat(logFile);
-          return true;
-        } catch {
-          return false;
-        }
-      });
-      expect(
-        JSON.parse(
-          JSON.stringify(events('root').path(path.join(dir, 'src', 'App.tsx')))
-        )
-      ).toBe('src/App.tsx');
+      const log = events('root');
+      const outside = path.join(dir, 'src', 'App.tsx');
+      expect(json(log.path(outside))).toBe(outside);
+      expect(json(log.path(process.cwd()))).toBe('.');
+      expect(json(log.path('src/App.tsx'))).toBe('src/App.tsx');
+      expect(json(log.path(null))).toBeNull();
     } finally {
       restoreLog();
       await fs.rm(dir, { recursive: true, force: true });
@@ -325,7 +345,6 @@ describe('api', () => {
   it('serializes errors with cause chains through the error helper', async () => {
     const { events } = await import('../events');
     const log = events('custom');
-    const json = (value: unknown) => JSON.parse(JSON.stringify(value));
 
     const error = new Error('outer', { cause: new TypeError('root') });
     expect(json(log.error(error))).toEqual({
@@ -656,6 +675,8 @@ function testSocketPath(dir: string, name: string) {
     ? `\\\\.\\pipe\\event-log-test-${process.pid}-${socketCount++}-${name}`
     : path.join(dir, name);
 }
+
+const json = (value: unknown) => JSON.parse(JSON.stringify(value));
 
 function setSessionDir(dir: string) {
   _setSessionBaseDir(dir);

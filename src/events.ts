@@ -77,10 +77,15 @@ function relativePath(target: string | undefined | null) {
   return {
     toJSON(): string | null {
       try {
-        return target != null && path.isAbsolute(target)
-          ? path.relative(eventLogState.logPath, target).replace(/\\/g, '/') ||
-              '.'
-          : (target ?? null);
+        if (target == null || !path.isAbsolute(target)) return target ?? null;
+        const relative = path
+          .relative(eventLogState.logPath, target)
+          .replace(/\\/g, '/');
+        if (!relative) {
+          return '.';
+        } else {
+          return relative.length < target.length ? relative : target;
+        }
       } catch {
         return target || null;
       }
